@@ -11,7 +11,7 @@ object BatchRecommender {
     val sc = new SparkContext(conf)
     val eventLines = sc.textFile(eventFiles) //num of partitions determined by inputformat
 
-    //parse into tuple
+    //parse daily ratings into tuple
     val eventTuples = eventLines.map(line => line.split(",") match {
       case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
         (userid, trackid, timestamp, msPlayed, reasonStart, reasonEnd)
