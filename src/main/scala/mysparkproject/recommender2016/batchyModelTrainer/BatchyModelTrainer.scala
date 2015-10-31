@@ -15,10 +15,10 @@ object batchyModelTrainer {
     val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt"
     should be a HDFS path in config file. mocking for now
     */
-    val ratingsFiles = "/Users/yliu/deployment/recommendationProject/*"
+    val ratingsFiles = "/Users/yliu/deployment/recommendationProject/accumulatedRatings*"
     val conf = new SparkConf().setAppName("Batch Model Trainer")
     val sc = new SparkContext(conf)
-    val ratingsLines = sc.textFile(ratingsFiles) //num of partitions determined by inputformat
+    val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
 
     //parse acc ratings into tuple
     val ratingsTuples = ratingsLines.map(line => line.split(",") match {
@@ -44,9 +44,10 @@ object batchyModelTrainer {
      */
     def readDailyRatingFromUserId(userId: String) = {
       //mock hashing
-      val partitionId = userId.toInt % 4
+      val partitionId = 1 + userId.toInt % 4
       //mock file name. name should be fetched from config file and contain date
-      val partitionFileName = "daily_user_track_event_001_00" + partitionId
+      val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_00" + partitionId + ".txt"
+      // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
       println("trying to read daily event partition file at: " + partitionFileName)
       var events = List[(String, String, String, String, String, String)]()
       for (line <- Source.fromFile(partitionFileName).getLines()) {
@@ -62,7 +63,7 @@ object batchyModelTrainer {
     }
     val ratingsWithDailyRating = ratingsWithinThreeYears.map(rating => rating._1 -> (rating._2, readDailyRatingFromUserId(rating._1)))
     //in the form of userid -> (list of acc ratings, list of daily events)
-    ratingsWithinThreeYears.foreach { case (k, v) => println("key: " + k + " value: " + v) }
+    ratingsWithDailyRating.foreach { case (k, v) => println("key: " + k + " value: " + v.toString()) }
 
     //filter tracks listened less than 10 times or not active within 6 months. visit external DB
     val activeRatings = ratingsWithDailyRating.filter(rating => rating._1 != "") //mock 10 & 6 here
