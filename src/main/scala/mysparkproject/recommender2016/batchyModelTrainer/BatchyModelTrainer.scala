@@ -17,7 +17,7 @@ object batchyModelTrainer {
     val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt"
     should be a HDFS path in config file. mocking for now
     */
-    val ratingsFiles = "/Users/yliu/deployment/recommendationProject/accumulatedRatings*"
+    val ratingsFiles = "/Users/yliu/deployment/recommendationProject/accumulatedRatings-001-001.txt"
     val conf = new SparkConf().setAppName("Batch Model Trainer")
     val sc = new SparkContext(conf)
     val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
@@ -78,7 +78,7 @@ object batchyModelTrainer {
     
     
     //in the form of userid -> (list of acc ratings, list of daily events)
-    ratingsWithDailyRating.map { case (k, v) => println("key: " + k + " value: " + v.toString()) }
+    ratingsWithDailyRating.foreach { case (k, v) => println("just merged. key: " + k + " value: " + v.toString()) }
 
     //filter tracks listened less than 10 times or not active within 6 months. visit external DB
     val activeRatings = ratingsWithDailyRating.filter(rating => rating._1 != "") //mock 10 & 6 here
@@ -91,13 +91,17 @@ object batchyModelTrainer {
     }
     
     //write back to acc rating files. for fault tolerant purpose, we write to temp files and then rename
-    activeRatings.mapPartitions( rating => {
+    val justToRunAJob = activeRatings.mapPartitions( ratingItr => {
       val writer = new PrintWriter(new File("accumulatedRatings-new-001-001.txt" ))
-      activeRatings.map(rating => writer.write(rating._1 + "," + rating._2._1 + "," + rating._2._2))
+      while(ratingItr.hasNext){
+        val rating = ratingItr.next()
+        writer.write(rating._1 + "," + rating._2._1 + "," + rating._2._2)
+      }
       writer.close()
       "not need for return".iterator
     }
     , true)
+    justToRunAJob.count()//just to trigger the writing above
     
     val eventRatings = activeRatings.map(rating => convertToRating(rating))
 
