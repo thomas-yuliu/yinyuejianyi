@@ -1,0 +1,70 @@
+
+    /* read hdfs file once per user. not desired
+    def readDailyRatingFromUserId(userId: String) = {
+      //mock hashing
+      val partitionId = 1 + userId.toInt % 4
+      //mock file name. name should be fetched from config file and contain date
+      val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_00" + partitionId + ".txt"
+      // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
+      println("trying to read daily event partition file at: " + partitionFileName)
+      var events = List[(String, String, String, String, String, String)]()
+        if(Files.exists(Paths.get(partitionFileName))){
+        for (line <- Source.fromFile(partitionFileName).getLines()) {
+          val event = line.split(",") match {
+            case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
+              (userid, trackid, timestamp, msPlayed, reasonStart, reasonEnd)
+          }
+          if (event._1 == userId) {
+            events ::= event
+          }
+        }
+        }
+      events
+    }
+    val ratingsWithDailyRating = ratingsWithinThreeYears.map(rating => rating._1 -> (rating._2, readDailyRatingFromUserId(rating._1)))
+    */
+    
+    
+    //build a map from user+track to rating in memory from acc ratings 
+    //we read records in daily rating files one by one. as we read one, calculate the event's score and update the map
+    //if user+track doesn't exist yet, insert; otherwise, add current event score to the existing score
+    
+    def readDailyRatingForEachPartition(itr: Iterator[(String, Seq[(String,String,Long,Double)])]) : Iterator[(String, (Long,Double))] = {
+      //maintain a map of userId+trackId -> (time,rating)
+      val accMap:scala.collection.mutable.Map[String, (Long,Double)] = scala.collection.mutable.Map()
+      var element = ("", Seq[(String,String,Long,Double)]())
+      while(itr.hasNext){
+        element = itr.next
+        for(pair <- element._2){
+          //compose composite key: user id + track id
+          val key = pair._1 + "+" + pair._2
+          accMap.put(key,(pair._3, pair._4))
+        }
+      }
+       //mock hashing. use the last usersId is ok
+      val partitionId = 1 + element._1.toInt % 4
+      //mock file name. name should be fetched from config file and contain date
+      val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_00" + partitionId + ".txt"
+      // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
+      println("trying to read daily event partition file at: " + partitionFileName)
+      val randomGenerator = scala.util.Random
+      var events = List[(String, String, String, String, String, String)]()
+      if(Files.exists(Paths.get(partitionFileName))){
+        for (line <- Source.fromFile(partitionFileName).getLines()) {
+          val event = line.split(",") match {
+            case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
+              (userid, trackid, timestamp.toLong, msPlayed, reasonStart, reasonEnd)
+          }
+          //mock calculating score
+          val thisEventScore = randomGenerator.nextDouble() * 5
+          //insert into map
+          val key = event._1+"+"+event._2
+          val previousScoreAndTime = accMap.getOrElse(key, (0,0D))
+          accMap.put(key, (event._3, previousScoreAndTime._2 + thisEventScore))
+        }
+      }
+      accMap.iterator
+    }
+    //val ratingsWithDailyRating = ratingsWithinThreeYears.mapPartitions(readDailyRatingForEachPartition, true)
+    
+    
