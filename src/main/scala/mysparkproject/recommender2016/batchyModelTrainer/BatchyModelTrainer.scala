@@ -46,15 +46,18 @@ object batchyModelTrainer {
         for(pair <- element._2){
           //compose composite key: user id + track id
           val key = pair._1 + "," + pair._2
+          println("rating merging. building map: " + key + ";" +  (pair._3, pair._4))
           accMap.put(key,(pair._3, pair._4))
         }
       }
-       //mock hashing. use the last usersId is ok
+      println("rating merging. map built: " + accMap.toString())
+      
+       //mock hashing. in real case, one partition only one file. use the last usersId is ok.
       val partitionId = 1 + element._1.toInt % 4
       //mock file name. name should be fetched from config file and contain date
       val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_00" + partitionId + ".txt"
       // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
-      println("trying to read daily event partition file at: " + partitionFileName)
+      println("rating merging. reading daily event partition file at: " + partitionFileName)
       val randomGenerator = scala.util.Random
       var events = List[(String, String, String, String, String, String)]()
       if(Files.exists(Paths.get(partitionFileName))){
@@ -70,15 +73,16 @@ object batchyModelTrainer {
           val key = event._1+","+event._2
           val previousScoreAndTime = accMap.getOrElse(key, (0,0D))
           accMap.put(key, (event._3, previousScoreAndTime._2 + thisEventScore))
+          println("rating merging. " + key + " current score: " + previousScoreAndTime + " new record: " + event + " new score:" + (event._3, previousScoreAndTime._2 + thisEventScore))
         }
       }
       accMap.iterator
     }
     , true)
-    
-    
+        
     //in the form of userid -> (list of acc ratings, list of daily events)
-    ratingsWithDailyRating.foreach { case (k, v) => println("just merged. key: " + k + " value: " + v.toString()) }
+    ratingsWithDailyRating.cache()
+    ratingsWithDailyRating.foreach { case (k, v) => println("rating merging. key: " + k + " value: " + v.toString()) }
 
     //filter tracks listened less than 10 times or not active within 6 months. visit external DB
     val activeRatings = ratingsWithDailyRating.filter(rating => rating._1 != "") //mock 10 & 6 here
@@ -91,11 +95,12 @@ object batchyModelTrainer {
     }
     
     //write back to acc rating files. for fault tolerant purpose, we write to temp files and then rename
-    val justToRunAJob = activeRatings.mapPartitions( ratingItr => {
-      val writer = new PrintWriter(new File("accumulatedRatings-new-001-001.txt" ))
+    activeRatings.cache()
+    val justToRunAJob = activeRatings.mapPartitionsWithIndex((index, ratingItr) => {
+      val writer = new PrintWriter(new File("/Users/yliu/deployment/recommendationProject/accumulatedRatings-new-001-00" + index + ".txt"))
       while(ratingItr.hasNext){
         val rating = ratingItr.next()
-        writer.write(rating._1 + "," + rating._2._1 + "," + rating._2._2)
+        writer.append(rating._1 + "," + rating._2._1 + "," + rating._2._2 + "\n")
       }
       writer.close()
       "not need for return".iterator
