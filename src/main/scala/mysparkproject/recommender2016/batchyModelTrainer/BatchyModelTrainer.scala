@@ -1,7 +1,6 @@
 package mysparkproject.recommender2016.batchyModelTrainer
 
 import org.apache.spark.SparkContext
-import org.apache.spark.SparkContext._
 import org.apache.spark.SparkConf
 import org.apache.spark.mllib.recommendation.ALS
 import org.apache.spark.mllib.recommendation.MatrixFactorizationModel
@@ -121,9 +120,13 @@ object batchyModelTrainer {
 
     //fetch track vectors
     val productVectorsRDD = model.productFeatures
+    /*
     //validation of productVectorsRDD
     val finalresult = productVectorsRDD.collect()
     println("finalresult:")
     finalresult.foreach(ele => println(ele._1, ele._2.mkString(" ")))
+    */
+    
+    //neglecting saving vectors to sparkey files
   }
 }
