@@ -97,6 +97,7 @@ object batchyModelTrainer {
     //write back to acc rating files. for fault tolerant purpose, we write to temp files and then rename
     activeRatings.cache()
     val justToRunAJob = activeRatings.mapPartitionsWithIndex((index, ratingItr) => {
+      //in real world, file name should based on hash value of userid
       val writer = new PrintWriter(new File("/Users/yliu/deployment/recommendationProject/accumulatedRatings-new-001-00" + index + ".txt"))
       while(ratingItr.hasNext){
         val rating = ratingItr.next()

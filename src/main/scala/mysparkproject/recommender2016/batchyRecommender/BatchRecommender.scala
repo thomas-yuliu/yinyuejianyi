@@ -6,10 +6,11 @@ import org.apache.spark.SparkConf
 
 object BatchRecommender {
   def main(args: Array[String]) {
-    val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt" // configurable
+    //val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt" // configurable
+    val eventFiles = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_*.txt" // configurable
     val conf = new SparkConf().setAppName("Batch Recommender")
     val sc = new SparkContext(conf)
-    val eventLines = sc.textFile(eventFiles) //num of partitions determined by inputformat
+    val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
 
     //parse daily ratings into tuple
     val eventTuples = eventLines.map(line => line.split(",") match {
@@ -91,15 +92,40 @@ object BatchRecommender {
     val trackWithRecVectorFiltered = trackWithRecVectorCalculated.filter(element => 2 == 2)
     //group rec tracks for each user
     val userAllRecTracks = trackWithRecVectorFiltered.groupBy(_._1)
+    /*
     //validation of groupBy
     val finalresult = userAllRecTracks.collect()
     println("finalresult:")
     finalresult.foreach(ele => println(ele))
+    */
     
-    //neglecting rank by rec score of tracks within each user's data record. should be included in official version as it is computationally heavy
+    //rank by rec score of tracks within each user's data record.
+    val perUserRecs = userAllRecTracks.map(userTracks => {
+        val userTrackList = userTracks._2.toList
+        val AllSortedRecUserTrackList = userTrackList.map(trackRecs => {
+            val recTrackList = List(trackRecs._3, trackRecs._4, trackRecs._5, trackRecs._6, trackRecs._7)
+            val sortedRecForOneTrack = recTrackList.sortBy(_._2)
+            sortedRecForOneTrack
+          }
+        )//now AllSortedRecUserTrackList is ((trackId, score),...,(trackId, score)),((trackId, score),...,(trackId, score)),...
+        val flatRecList = AllSortedRecUserTrackList.flatMap(sortedRecForOneTrack => {
+          sortedRecForOneTrack.iterator
+        })//now flatRecList is (trackId, score),(trackId, score),...
+        //should not merge by track id here because trackId with higher score means it should be reced because of some track
+        //return result (userId, List((trackId, score),(trackId, score),...))
+        (userTracks._1, flatRecList)
+      }
+    )
+    //validation
+    println("finalresult:")
+    val finalresult = perUserRecs.collect()
+    finalresult.foreach(ele => println(ele))
+    
+    //mocking filtering track dismissed by user
     //neglecting compute diversity factor
     //neglecting top30 per user
 		
+    //storing the value to cassandra table
     
   }
 }
