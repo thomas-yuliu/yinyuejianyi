@@ -15,7 +15,7 @@ object StreamingRecommender {
     val topicMap = collection.immutable.HashMap("test" -> 1)
 
     val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap).map(_._2)
-    msgs.saveAsTextFiles("/Users/yliu/deployment/recommendationProject/streamingResult/sresult", "txt")
+    //msgs.saveAsTextFiles("/Users/yliu/deployment/recommendationProject/streamingResult/sresult", "txt")
 
     //parse daily events into tuple
     val eventPairs = msgs.map(line => line.split(",") match {
@@ -74,7 +74,12 @@ object StreamingRecommender {
     val sortedRec = recWithDiversity.map(userRec => (userRec._1, userRec._2.sortBy(rec => rec._2).take(30)))
     
     //save recs for each user to cassandra
-    sortedRec.foreach(event=>{})
+    sortedRec.foreach(event=>{
+      val rddSize = event.count()
+      if(rddSize > 0){
+        event.saveAsTextFile("/Users/yliu/deployment/recommendationProject/streamingResult" + event.id + ".txt")
+      }
+    })
     
     ssc.start()
     ssc.awaitTerminationOrTimeout(10 * 1000) //10 sec
