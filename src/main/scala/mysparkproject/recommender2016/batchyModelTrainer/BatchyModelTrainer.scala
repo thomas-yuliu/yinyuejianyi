@@ -16,6 +16,9 @@ object batchyModelTrainer {
     val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt"
     should be a HDFS path in config file. mocking for now
     */
+    val installation_path = sys.env("INSTALL_LOCATION")
+    BatchRecommender.loadInputConfigFile(installation_path + "/config/recommenderConfig.json")
+    
     val ratingsFiles = "/Users/yliu/deployment/recommendationProject/accumulatedRatings-001-001.txt"
     val conf = new SparkConf().setAppName("Batch Model Trainer")
     val sc = new SparkContext(conf)

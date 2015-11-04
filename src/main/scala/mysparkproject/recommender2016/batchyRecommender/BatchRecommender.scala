@@ -3,21 +3,14 @@ package mysparkproject.recommender2016.batchyRecommender
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 
-import java.io.FileReader;
-import java.io.IOException;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import mysparkproject.recommender2016.util.ConfigLoader
 
 object BatchRecommender {
-  var jsonObject = new JSONObject()
   
   def main(args: Array[String]) {
-    val installation_path = sys.env("INSTALL_LOCATION")
-    loadInputConfigFile(installation_path + "/config/recommenderConfig.json")
     
     //mocking input file on HDFS
-    val eventFiles = jsonObject.get("daily_rating_path").toString()
+    val eventFiles = ConfigLoader.query("daily_rating_path")
     val conf = new SparkConf().setAppName("Batch Recommender")
     val sc = new SparkContext(conf)
     val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
@@ -137,15 +130,5 @@ object BatchRecommender {
 		
     //storing the value to cassandra table
     
-  }
-  
-  def loadInputConfigFile(inputFilePath:String) = {
-    val parser = new JSONParser();
-    try {
-      jsonObject = parser.parse(new FileReader(inputFilePath)).asInstanceOf[JSONObject]
-    } catch {
-      case ioe: IOException => println("IOException: " + ioe)
-      case pe: ParseException => println("ParseException: " + pe)
-    }
   }
 }
