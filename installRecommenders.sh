@@ -26,11 +26,43 @@ tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
 cd spark-1.5.1-bin-hadoop2.6
 bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
+bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 
 # for streaming
+sudo su -
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION
 wget http://apache.mivzakim.net/kafka/0.8.2.0/kafka_2.10-0.8.2.0.tgz
 tar -zxvf kafka_2.10-0.8.2.0.tgz
 cd kafka_2.10-0.8.2.0
+#zookeeper
+
 bin/zookeeper-server-start.sh config/zookeeper.properties
 
+# kafka server
+
+bin/kafka-server-start.sh config/server.properties
+
+# create topic
+
+bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic test
+
+＃producer
+
+bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test 
+
+
+
+
+
+# on local vagrant VM only
+cp target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar ~/ambari-vagrant/centos6.5
+cp config/recommenderConfig.json  ~/ambari-vagrant/centos6.5
+# then on vm
+sudo su -
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION
+
+cp /vagrant/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar .
+cp /vagrant/recommenderConfig.json config/

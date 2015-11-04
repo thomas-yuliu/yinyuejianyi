@@ -80,7 +80,7 @@ object StreamingRecommender {
     sortedRec.foreach(event=>{
       val rddSize = event.count()
       if(rddSize > 0){
-        event.saveAsTextFile(ConfigLoader.query("streaming_validation_file_path_toConstruct") + event.id + ".txt")       
+        event.saveAsTextFile(ConfigLoader.query("streaming_validation_file_path_toConstruct") + event.id)       
       }
     })
     
