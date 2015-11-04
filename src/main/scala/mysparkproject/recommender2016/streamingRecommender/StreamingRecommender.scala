@@ -5,6 +5,8 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka._
 
+import mysparkproject.recommender2016.util.ConfigLoader
+
 object StreamingRecommender {
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Streaming Recommender")
@@ -12,7 +14,8 @@ object StreamingRecommender {
 
     val zkQuorum = "localhost"
     val consumerGroup = "streamingRecommender"
-    val topicMap = collection.immutable.HashMap("test" -> 1)
+    val topicName = ConfigLoader.query("daily_rating_kafka_topic")
+    val topicMap = collection.immutable.HashMap(topicName -> 1)
 
     val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap).map(_._2)
     //msgs.saveAsTextFiles("/Users/yliu/deployment/recommendationProject/streamingResult/sresult", "txt")
@@ -77,7 +80,7 @@ object StreamingRecommender {
     sortedRec.foreach(event=>{
       val rddSize = event.count()
       if(rddSize > 0){
-        event.saveAsTextFile("/Users/yliu/deployment/recommendationProject/streamingResult" + event.id + ".txt")
+        event.saveAsTextFile(ConfigLoader.query("streaming_validation_file_path_toConstruct") + event.id + ".txt")       
       }
     })
     
