@@ -24,9 +24,23 @@ wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz
 tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
 
 cd spark-1.5.1-bin-hadoop2.6
+export SPARK_SSH_FOREGROUND=vagrant
+
+＃local batch rec
 bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
+# standalone cluster batch rec
+bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://c6501.ambari.apache.org:7077  --executor-memory 1G --total-executor-cores 1 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar 1000
+
+# standalone cluster model trainer
+bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://c6501.ambari.apache.org:7077  --executor-memory 1G --total-executor-cores 1 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar 1000
+
+
+# local streaming
 bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+
+
 
 
 # for streaming
@@ -57,9 +71,9 @@ bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
 
 
 # on local vagrant VM only
-cp target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar ~/ambari-vagrant/centos6.5
+cp ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar ~/ambari-vagrant/centos6.5
 cp config/recommenderConfig.json  ~/ambari-vagrant/centos6.5
-# then on vm
+# then on vm (master only)
 sudo su -
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION

@@ -19,6 +19,8 @@ object batchyModelTrainer {
     should be a HDFS path in config file. mocking for now
     */
     val ratingsFiles = ConfigLoader.query("accumulated_rating_file_path")
+    val accFilesToConstruct = ConfigLoader.query("updated_accumulated_rating_file_path_toConstruct")
+    val dailyRatingFileToConstruct = ConfigLoader.query("daily_rating_file_path_toConstruct")
     val conf = new SparkConf().setAppName("Batch Model Trainer")
     val sc = new SparkContext(conf)
     val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
@@ -56,7 +58,7 @@ object batchyModelTrainer {
        //mock hashing. in real case, one partition only one file. use the last usersId is ok.
       val partitionId = 1 + element._1.toInt % 4
       //mock file name. name should be fetched from config file and contain date
-      val partitionFileName = ConfigLoader.query("daily_rating_file_path_toConstruct") + partitionId + ".txt"
+      val partitionFileName = dailyRatingFileToConstruct + partitionId + ".txt"
       // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
       println("rating merging. reading daily event partition file at: " + partitionFileName)
       val randomGenerator = scala.util.Random
@@ -99,7 +101,7 @@ object batchyModelTrainer {
     activeRatings.cache()
     val justToRunAJob = activeRatings.mapPartitionsWithIndex((index, ratingItr) => {
       //in real world, file name should based on hash value of userid
-      val writer = new PrintWriter(new File(ConfigLoader.query("updated_accumulated_rating_file_path_toConstruct") + index + ".txt"))
+      val writer = new PrintWriter(new File(accFilesToConstruct + index + ".txt"))
       while(ratingItr.hasNext){
         val rating = ratingItr.next()
         writer.append(rating._1 + "," + rating._2._1 + "," + rating._2._2 + "\n")

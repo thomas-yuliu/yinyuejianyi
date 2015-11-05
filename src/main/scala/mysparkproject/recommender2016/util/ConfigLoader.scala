@@ -8,6 +8,14 @@ import org.json.simple.parser.ParseException;
 
 object ConfigLoader {
   val installation_path = sys.env("INSTALL_LOCATION")
+  println("")
+  println("")
+  println("")
+  println("system env: " + sys.env.toString())
+  println("")
+  println("")
+  println("")
+  println("")
   var jsonObject = loadInputConfigFile(installation_path + "/config/recommenderConfig.json")
   
   def loadInputConfigFile(inputFilePath:String):JSONObject = {
