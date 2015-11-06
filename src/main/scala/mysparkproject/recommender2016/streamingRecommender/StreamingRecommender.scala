@@ -85,6 +85,7 @@ object StreamingRecommender {
     })
     
     ssc.start()
-    ssc.awaitTerminationOrTimeout(10 * 1000) //10 sec
+    ssc.awaitTermination()
+    //ssc.awaitTerminationOrTimeout(10 * 1000) //10 sec
   }
 }
