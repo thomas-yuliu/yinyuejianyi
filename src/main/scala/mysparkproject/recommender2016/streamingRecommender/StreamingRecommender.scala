@@ -4,20 +4,28 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka._
+import org.apache.spark.storage.StorageLevel
 
 import mysparkproject.recommender2016.util.ConfigLoader
 
 object StreamingRecommender {
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Streaming Recommender")
-    val ssc = new StreamingContext(conf, Seconds(5)) //will be per minute in real case
-
+    //val ssc = new StreamingContext(conf, Seconds(5)) //will be per minute in real case
+    
+    val checkpoint_dir = "/sparkproject/streaming_checkpoint"
+    def creatingFunc() : StreamingContext = {
+      val ssc = new StreamingContext(conf, Seconds(10)) //will be per minute in real case
+      ssc.checkpoint(checkpoint_dir)
+      ssc
+    }
+    val ssc = StreamingContext.getOrCreate(checkpoint_dir, creatingFunc)
     val zkQuorum = "localhost"
     val consumerGroup = "streamingRecommender"
     val topicName = ConfigLoader.query("daily_rating_kafka_topic")
     val topicMap = collection.immutable.HashMap(topicName -> 1)
 
-    val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap).map(_._2)
+    val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap, StorageLevel.MEMORY_AND_DISK_SER).map(_._2)
     //msgs.saveAsTextFiles("/Users/yliu/deployment/recommendationProject/streamingResult/sresult", "txt")
 
     //parse daily events into tuple
