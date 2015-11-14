@@ -2,6 +2,7 @@ package mysparkproject.recommender2016.batchyRecommender
 
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
+import org.apache.spark.storage.StorageLevel
 
 import mysparkproject.recommender2016.util.ConfigLoader
 
@@ -75,6 +76,7 @@ object BatchRecommender {
       //replace item vector for the event with rec vectors for the item
       //user id, track id, weight, 5 rec vectors
       (event._1, event._2, event._3, mockRecVector, mockRecVector, mockRecVector, mockRecVector, mockRecVector))
+      .persist(StorageLevel.MEMORY_AND_DISK_SER_2)
     /*//validation of rec vector fetching
     val finalresult = eventWithRecVectorAndWeight.collect()
     println("finalresult:")

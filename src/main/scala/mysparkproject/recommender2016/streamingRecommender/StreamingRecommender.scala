@@ -5,6 +5,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming._
 import org.apache.spark.streaming.kafka._
 import org.apache.spark.storage.StorageLevel
+import scala.collection.mutable.ListBuffer
 
 import mysparkproject.recommender2016.util.ConfigLoader
 
@@ -22,6 +23,13 @@ object StreamingRecommender {
       ssc
     }
     val ssc = StreamingContext.getOrCreate(checkpoint_dir, creatingFunc)
+    //mock broadcasting user vector: XXT
+    val mockedXXT = new ListBuffer[String]()
+    for(a <- 1 to 1000){
+       mockedXXT ++= Seq("variable")
+    }
+    val mockedBCVariable = ssc.sparkContext.broadcast(mockedXXT)
+    
     val zkQuorum = "localhost"
     val consumerGroup = "streamingRecommender"
     val topicName = ConfigLoader.query("daily_rating_kafka_topic")
@@ -35,7 +43,7 @@ object StreamingRecommender {
       case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
         trackid -> (userid, trackid, timestamp, msPlayed, reasonStart, reasonEnd)
     })
-
+    
     val groupByTrack = eventPairs.map(event => event._1 -> List(event._2)) //convert to list to make reduce function easier
       .reduceByKey((event1, event2) => event1 ++ event2)//could be a long list for hot songs
     //now in the form of trackId -> list(event)
@@ -55,8 +63,17 @@ object StreamingRecommender {
     val updatedVector = fetchedTrackVector.map(trackJson => (trackJson._1, (0.1, 0.1, 0.1), trackJson._3))
 
     //mock fetching rec tracks for this track from ANNOY
-    val findRecVector = updatedVector.map(trackJson => (trackJson._1, List((0.1, 0.1, 0.1),(0.2, 0.2, 0.2),(0.3, 0.3, 0.3)), trackJson._3))
+    val findRecVector = updatedVector.map(trackJson => (trackJson._1, List((0.1, 0.1, 0.1),(0.2, 0.2, 0.2),(0.3, 0.3, 0.3)), trackJson._3)).persist(StorageLevel.MEMORY_AND_DISK_SER_2)
 
+    //only to demo broadcasted variables are accessible from workers
+    /*val nothing = findRecVector.map(rec => {
+      println("I found broadcast variable" + mockedBCVariable.value)
+      rec
+    })
+    nothing.foreach(record => {
+      record.saveAsTextFile("/Users/yliu/nothing/ok")
+    })*/
+    
     //mock calculating cosine similarity for each rec vector
     val cosSimForEachRec = findRecVector.map(trackJson => (trackJson._1, List((0.1, 0.1, 0.1, 299),(0.2, 0.2, 0.2, 300),(0.3, 0.3, 0.3, 150)), trackJson._3))
 
