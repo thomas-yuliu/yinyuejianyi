@@ -5,6 +5,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.mllib.recommendation.ALS
 import org.apache.spark.mllib.recommendation.MatrixFactorizationModel
 import org.apache.spark.mllib.recommendation.Rating
+import org.apache.spark.storage.StorageLevel
 import scala.io.Source
 import java.nio.file.{Paths, Files}
 import java.io._
@@ -22,6 +23,7 @@ object batchyModelTrainer {
     val accFilesToConstruct = ConfigLoader.query("updated_accumulated_rating_file_path_toConstruct")
     val dailyRatingFileToConstruct = ConfigLoader.query("daily_rating_file_path_toConstruct")
     val conf = new SparkConf().setAppName("Batch Model Trainer")
+    conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     val sc = new SparkContext(conf)
     val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
 
@@ -98,7 +100,7 @@ object batchyModelTrainer {
     }
     
     //write back to acc rating files. for fault tolerant purpose, we write to temp files and then rename
-    activeRatings.cache()
+    activeRatings.persist(StorageLevel.MEMORY_AND_DISK_SER_2)
     val justToRunAJob = activeRatings.mapPartitionsWithIndex((index, ratingItr) => {
       //in real world, file name should based on hash value of userid
       val writer = new PrintWriter(new File(accFilesToConstruct + index + ".txt"))
@@ -124,13 +126,13 @@ object batchyModelTrainer {
 
     //fetch track vectors
     val productVectorsRDD = model.productFeatures
-    /*
+    
     //validation of productVectorsRDD
     val finalresult = productVectorsRDD.collect()
     println("finalresult:")
     finalresult.foreach(ele => println(ele._1, ele._2.mkString(" ")))
-    */
     
-    //neglecting saving vectors to sparkey files
+    
+    //neglecting saving vectors to sparkey and ANNOY files
   }
 }

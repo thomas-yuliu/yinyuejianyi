@@ -12,6 +12,7 @@ object BatchRecommender {
     //mocking input file on HDFS
     val eventFiles = ConfigLoader.query("daily_rating_file_path")
     val conf = new SparkConf().setAppName("Batch Recommender")
+    conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     val sc = new SparkContext(conf)
     val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
 

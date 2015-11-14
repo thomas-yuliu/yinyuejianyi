@@ -11,8 +11,10 @@ import mysparkproject.recommender2016.util.ConfigLoader
 object StreamingRecommender {
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("Streaming Recommender")
+    conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     //val ssc = new StreamingContext(conf, Seconds(5)) //will be per minute in real case
     
+    //in real case should be HDFS path, it seems to work now
     val checkpoint_dir = "/sparkproject/streaming_checkpoint"
     def creatingFunc() : StreamingContext = {
       val ssc = new StreamingContext(conf, Seconds(10)) //will be per minute in real case
@@ -35,7 +37,7 @@ object StreamingRecommender {
     })
 
     val groupByTrack = eventPairs.map(event => event._1 -> List(event._2)) //convert to list to make reduce function easier
-      .reduceByKey((event1, event2) => event1 ++ event2)
+      .reduceByKey((event1, event2) => event1 ++ event2)//could be a long list for hot songs
     //now in the form of trackId -> list(event)
     val computedWeight = groupByTrack.map {
       case (trackId, events) => {
@@ -46,13 +48,13 @@ object StreamingRecommender {
       }
     }
 
-    //mock fetching rec vector
+    //mock fetching rec vector from Sparkey
     val fetchedTrackVector = computedWeight.map { trackJson => (trackJson._1, (0.1, 0.1, 0.1), trackJson._2)}
     
     //mock updating track vector with ML ALS, using data needed for training ALS in DB
     val updatedVector = fetchedTrackVector.map(trackJson => (trackJson._1, (0.1, 0.1, 0.1), trackJson._3))
 
-    //mock updating track vector with ML ALS, using data needed for training ALS in DB
+    //mock fetching rec tracks for this track from ANNOY
     val findRecVector = updatedVector.map(trackJson => (trackJson._1, List((0.1, 0.1, 0.1),(0.2, 0.2, 0.2),(0.3, 0.3, 0.3)), trackJson._3))
 
     //mock calculating cosine similarity for each rec vector
@@ -91,6 +93,8 @@ object StreamingRecommender {
         event.saveAsTextFile(ConfigLoader.query("streaming_validation_file_path_toConstruct") + event.id)       
       }
     })
+    
+    //neglecting saving recs to Cassandra
     
     ssc.start()
     ssc.awaitTermination()
