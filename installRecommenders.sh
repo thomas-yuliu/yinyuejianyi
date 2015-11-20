@@ -78,6 +78,7 @@ mkdir config
 cp /vagrant/recommenderConfig.json config
 cp /vagrant/acc* .
 cp /vagrant/daily* .
+mkdir $INSTALL_LOCATION/sparkeventlogs
 cp /vagrant/spark-defaults.conf /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
 
 #on master only

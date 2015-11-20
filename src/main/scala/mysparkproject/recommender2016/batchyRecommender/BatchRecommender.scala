@@ -4,29 +4,56 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.apache.spark.storage.StorageLevel
 
+import org.apache.hadoop.io.{LongWritable, Text}
+import scala.collection.mutable.ListBuffer
+
 import mysparkproject.recommender2016.util.ConfigLoader
+import mysparkproject.recommender2016.util.UnsplittableTextInputFormat
 
 object BatchRecommender {
   
   def main(args: Array[String]) {
     
     //mocking input file on HDFS
-    val eventFiles = ConfigLoader.query("daily_rating_file_path")
+    var eventFilesPath = ConfigLoader.query("daily_rating_file_path")
+    //overwriting input file location in local test
+    if (args.length > 0 && args(0).equals("test")){
+      eventFilesPath = "/sparkproject/localtest/daily_user_track_event_*.txt"
+    }
     val conf = new SparkConf().setAppName("Batch Recommender")
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     val sc = new SparkContext(conf)
-    val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
+    val eventLines = sc.hadoopFile(eventFilesPath, 
+        classOf[UnsplittableTextInputFormat], 
+        classOf[LongWritable],  
+        classOf[Text], 4)
+        .map(_._2.toString())
+    //val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
 
     //parse daily ratings into tuple
     val eventTuples = eventLines.map(line => line.split(",") match {
       case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
         (userid, trackid, timestamp, msPlayed, reasonStart, reasonEnd)
+      //neglecting checking for fault tolerant boundary marker
     })
     /*//validation of file reading and parsing
     val finalresult = eventTuples.collect()
     println("finalresult:")
-    finalresult.foreach(ele => println(ele._1 + ele._2 + ele._3 + ele._4 + ele._5))
+    finalresult.foreach(ele => println(ele._1 + ele._2 + ele._3 + ele._4 + ele._5 + ele._6))
     */
+    //mock a user id to make the rating's user id within this partition's user id range
+    val userIdRightEventTuples = eventTuples.mapPartitionsWithIndex((index, itr) => {
+      val rangeBottom = index * 60000000 / 10 //60M/10
+      val randomGenerator = scala.util.Random
+      val randomUserId = rangeBottom + randomGenerator.nextInt(60000000/10)
+      val fruits = new ListBuffer[(String, String, String, String, String, String)]()
+      while(itr.hasNext){
+        val next = itr.next()
+        val newItem = (randomUserId.toString,next._2,next._3,next._4,next._5,next._6)
+        fruits += newItem
+      }
+      fruits.iterator
+    }, true)
     //calculate weight
     def calculateWeightForEvent(event: (String, String, String, String, String, String)) = {
       val reasonStart = event._5
@@ -40,7 +67,7 @@ object BatchRecommender {
       val weight = reasonWeight * msPlayed
       (event._1, event._2, weight)
     }
-    val eventWithWeight = eventTuples.map(calculateWeightForEvent)
+    val eventWithWeight = userIdRightEventTuples.map(calculateWeightForEvent)
     /*//validation of weight calculation
     val finalresult = eventWithWeight.collect()
     println("finalresult:")
@@ -97,7 +124,15 @@ object BatchRecommender {
     //mock bloom filter
     val trackWithRecVectorFiltered = trackWithRecVectorCalculated.filter(element => 2 == 2)
     //group rec tracks for each user
-    val userAllRecTracks = trackWithRecVectorFiltered.groupBy(_._1)
+    //val userAllRecTracks = trackWithRecVectorFiltered.groupBy(_._1)
+    val userAllRecTracks = trackWithRecVectorFiltered.mapPartitions(itr => {
+      val fruits = new ListBuffer[(String, String, (String, Double), (String, Double), (String, Double), (String, Double), (String, Double))]()
+      while(itr.hasNext){
+        fruits += itr.next()
+      }
+      val groupedby = fruits.groupBy(_._1)
+      groupedby.iterator
+    }, true)
     /*
     //validation of groupBy
     val finalresult = userAllRecTracks.collect()
@@ -105,21 +140,24 @@ object BatchRecommender {
     finalresult.foreach(ele => println(ele))
     */
     
-    //rank by rec score of tracks within each user's data record.
+    // within each user's data record, rank rec tracksby rec score.
+    // start from extracting a list of (user, track, rec1, rec2,...)
     val perUserRecs = userAllRecTracks.map(userTracks => {
+        //get the list of (user, track, rec1, rec2,...) belonging to each user
         val userTrackList = userTracks._2.toList
+        //extracting rec from each (user, track, rec1, rec2,...)
         val AllSortedRecUserTrackList = userTrackList.map(trackRecs => {
-            val recTrackList = List(trackRecs._3, trackRecs._4, trackRecs._5, trackRecs._6, trackRecs._7)
-            val sortedRecForOneTrack = recTrackList.sortBy(_._2)
-            sortedRecForOneTrack
-          }
-        )//now AllSortedRecUserTrackList is ((trackId, score),...,(trackId, score)),((trackId, score),...,(trackId, score)),...
-        val flatRecList = AllSortedRecUserTrackList.flatMap(sortedRecForOneTrack => {
-          sortedRecForOneTrack.iterator
-        })//now flatRecList is (trackId, score),(trackId, score),...
+            //recTrackList is all recs from one event; trackRecs is one event
+            List(trackRecs._3, trackRecs._4, trackRecs._5, trackRecs._6, trackRecs._7)
+        }).flatMap { trackRecs => 
+          //splitting recs for one track into recs and aggregate all tracks' recs into a list
+          trackRecs.iterator }
+        //sort among all recs from all tracks according to their score
+        .sortBy(_._2)
+        
         //should not merge by track id here because trackId with higher score means it should be reced because of some track
         //return result (userId, List((trackId, score),(trackId, score),...))
-        (userTracks._1, flatRecList)
+        (userTracks._1, AllSortedRecUserTrackList)
       }
     )
     //validation

@@ -10,6 +10,10 @@ import scala.io.Source
 import java.nio.file.{Paths, Files}
 import java.io._
 
+import org.apache.hadoop.io.{LongWritable, Text}
+import scala.collection.mutable.ListBuffer
+
+import mysparkproject.recommender2016.util.UnsplittableTextInputFormat
 import mysparkproject.recommender2016.util.ConfigLoader
 
 object batchyModelTrainer {
@@ -19,22 +23,52 @@ object batchyModelTrainer {
     val eventFiles = "hdfs://c6501.ambari.apache.org:8020/user/yliu/spark-input/daily_user_track_event_*.txt"
     should be a HDFS path in config file. mocking for now
     */
-    val ratingsFiles = ConfigLoader.query("accumulated_rating_file_path")
-    val accFilesToConstruct = ConfigLoader.query("updated_accumulated_rating_file_path_toConstruct")
-    val dailyRatingFileToConstruct = ConfigLoader.query("daily_rating_file_path_toConstruct")
+    var ratingsFilesPath = ConfigLoader.query("accumulated_rating_file_path")
+    //overwriting input file location in local test
+    if (args.length > 0 && args(0).equals("test")){
+      ratingsFilesPath = "/sparkproject/localtest/accumulatedRatings-001*.txt"
+    }
+    var accFilesToConstruct = ConfigLoader.query("updated_accumulated_rating_file_path_toConstruct")
+    //overwriting input file location in local test
+    if (args.length > 0 && args(0).equals("test")){
+      accFilesToConstruct = "/sparkproject/localtest/accumulatedRatings-new-001-00"
+    }
+    var dailyRatingFileToConstruct = ConfigLoader.query("daily_rating_file_path_toConstruct")
+    //overwriting input file location in local test
+    if (args.length > 0 && args(0).equals("test")){
+      dailyRatingFileToConstruct = "/sparkproject/localtest/daily_user_track_event_00"
+    }
     val conf = new SparkConf().setAppName("Batch Model Trainer")
     conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     val sc = new SparkContext(conf)
-    val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
+    val ratingsLines = sc.hadoopFile(ratingsFilesPath, 
+        classOf[UnsplittableTextInputFormat], 
+        classOf[LongWritable],  
+        classOf[Text], 4)
+        .map(_._2.toString())
+    //val ratingsLines = sc.textFile(ratingsFiles,4) //num of partitions should be determined by inputformat
 
     //parse acc ratings into tuple
     val ratingsTuples = ratingsLines.map(line => line.split(",") match {
       case Array(userid: String, trackid: String, timestamp: String, ratings: String) =>
         (userid, trackid, timestamp.toLong, ratings.toDouble)
+      //neglecting checking for fault tolerant boundary marker
     })
-
+    //mock a user id to make the rating's user id within this partition's user id range
+    val userIdRightEventTuples = ratingsTuples.mapPartitionsWithIndex((index, itr) => {
+      val rangeBottom = index * 60000000 / 10 //60M/10
+      val randomGenerator = scala.util.Random
+      val fruits = new ListBuffer[(String, String, Long, Double)]()
+      while(itr.hasNext){
+        val next = itr.next()
+        val randomUserId = rangeBottom + randomGenerator.nextInt(60000000/10)
+        val newItem = (randomUserId.toString,next._2,next._3,next._4)
+        fruits += newItem
+      }
+      fruits.iterator
+    }, true)
     //filter ratings three years ago, tracks listened less than 10 times and not active within 6 months. visit external DB
-    val ratingsWithinThreeYears = ratingsTuples.filter { rating => rating._3 > 0 } //mock 3 years here
+    val ratingsWithinThreeYears = userIdRightEventTuples.filter { rating => rating._3 > 0 } //mock 3 years here
       .filter(rating => rating._3 > 0) //mock 10 times and 6 months
       .groupBy(rating => rating._1)//should we do on scala level, but not RDD level(to prevent shuffle scheduling)?
     //ratingsWithinThreeYears in the form of Map(userid -> list of ratings)
@@ -42,7 +76,7 @@ object batchyModelTrainer {
     //build a map from user+track to rating in memory from acc ratings 
     //we read records in daily rating files one by one. as we read one, calculate the event's score and update the map
     //if user+track doesn't exist yet, insert; otherwise, add current event score to the existing score
-    val ratingsWithDailyRating = ratingsWithinThreeYears.mapPartitions( itr =>{
+    val ratingsWithDailyRating = ratingsWithinThreeYears.mapPartitionsWithIndex((index, itr) =>{
       //maintain a map of userId+trackId -> (time,rating)
       val accMap:scala.collection.mutable.Map[String, (Long,Double)] = scala.collection.mutable.Map()
       var element = ("", Iterable[(String,String,Long,Double)]())
@@ -57,12 +91,15 @@ object batchyModelTrainer {
       }
       println("rating merging. map built: " + accMap.toString())
       
-       //mock hashing. in real case, one partition only one file. use the last usersId is ok.
-      val partitionId = 1 + element._1.toInt % 4
+      //mock hashing to get corresponding daily rating file, which contains random user id.
+      //mocking user id in daily rating file below. in real case, we use hashing instead of range.
+      val rangeBase = 60000000 / 10 //60M/10
+      val partitionFileId = 1 + element._1.toInt / rangeBase
       //mock file name. name should be fetched from config file and contain date
-      val partitionFileName = dailyRatingFileToConstruct + partitionId + ".txt"
+      val partitionFileName = dailyRatingFileToConstruct + partitionFileId + ".txt"
       // val partitionFileName = "/Users/yliu/deployment/recommendationProject/daily_user_track_event_001.txt"
       println("rating merging. reading daily event partition file at: " + partitionFileName)
+      val rangeBottom = index * 60000000 / 10 //60M/10
       val randomGenerator = scala.util.Random
       var events = List[(String, String, String, String, String, String)]()
       if(Files.exists(Paths.get(partitionFileName))){
@@ -70,15 +107,18 @@ object batchyModelTrainer {
           val event = line.split(",") match {
             case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
               (userid, trackid, timestamp.toLong, msPlayed, reasonStart, reasonEnd)
+            //neglecting checking for fault tolerant boundary marker
           }
+          val randomUserId = rangeBottom + randomGenerator.nextInt(60000000/10)
+          val newItem = (randomUserId.toString,event._2,event._3,event._4,event._5,event._6)
           //mock calculating score
           val thisEventScore = randomGenerator.nextDouble() * 5
           //neglect filter tracks listened less than 10 times or not active within 6 months
           //insert into map
-          val key = event._1+","+event._2
+          val key = newItem._1+","+newItem._2
           val previousScoreAndTime = accMap.getOrElse(key, (0,0D))
-          accMap.put(key, (event._3, previousScoreAndTime._2 + thisEventScore))
-          println("rating merging. " + key + " current score: " + previousScoreAndTime + " new record: " + event + " new score:" + (event._3, previousScoreAndTime._2 + thisEventScore))
+          accMap.put(key, (newItem._3, previousScoreAndTime._2 + thisEventScore))
+          println("rating merging. " + key + " current score: " + previousScoreAndTime + " new record: " + newItem + " new score:" + (newItem._3, previousScoreAndTime._2 + thisEventScore))
         }
       }
       accMap.iterator
