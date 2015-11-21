@@ -24,9 +24,8 @@
 #
 filename=daily_user_track_event_;
 directory=/sparkproject/
-#finalfilelimit=2000000000;  #2GB
-finalfilelimit=130000000;#300MB
-numOfTargetFile=5
+finalfilelimit=2000000000;  #2GB
+numOfTargetFile=10
 
 #
 # generate stub file

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# to install recommenders on CentosOS6.5
+# to install recommenders on google compute engine
 
 
 # run from your desktop
@@ -9,9 +9,9 @@ gcloud compute copy-files daily_user_track_event_00*.txt try-deploy-2:/sparkproj
 gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config  try-deploy-2:/sparkproject --zone us-central1-b
 
 
-# run from your desktop
 
 
+# to install recommenders on CentosOS6.4
 sudo su -
 yum install java-1.7.0-openjdk -y
 export JAVA_HOME=/usr/lib/jvm/jre-1.7.0-openjdk.x86_64/
@@ -66,20 +66,25 @@ bin/kafka-console-producer.sh --broker-list localhost:9092 --topic test
 
 # on local vagrant VM only
 # first on workspace
-cp ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar ~/ambari-vagrant/centos6.5
-cp ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  ~/ambari-vagrant/centos6.5
+cp ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar ~/ambari-vagrant/centos6.4
+cp ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  ~/ambari-vagrant/centos6.4
+cp ~/mavenWorkspace/spark-project/musicRecommender/installRecommenders.sh  ~/ambari-vagrant/centos6.4
 # then on vm 
 sudo su -
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
 
 cp /vagrant/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar .
+cp /vagrant/installRecommenders.sh .
 mkdir config
 cp /vagrant/recommenderConfig.json config
-cp /vagrant/acc* .
-cp /vagrant/daily* .
+#cp /vagrant/acc* .
+#cp /vagrant/daily* .
 mkdir $INSTALL_LOCATION/sparkeventlogs
 cp /vagrant/spark-defaults.conf /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
+cp /vagrant/spark-env.sh /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
+cp /vagrant/log4j.properties /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
+cp /vagrant/slaves /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
 
 #on master only
 export INSTALL_LOCATION=/sparkproject
@@ -96,8 +101,8 @@ rm -f accumulatedRatings-new*
 
 
 ＃local batch rec
-bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar test
 
 # local streaming
-bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --driver-memory 4g --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master local[12] ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar 
 
