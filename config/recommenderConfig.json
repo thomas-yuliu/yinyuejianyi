@@ -4,5 +4,6 @@
 	"accumulated_rating_file_path" : "/sparkproject/accumulatedRatings-001*.txt",
 	"updated_accumulated_rating_file_path_toConstruct" : "/sparkproject/accumulatedRatings-new-001-00",
 	"daily_rating_kafka_topic" : "test",
-	"streaming_validation_file_path_toConstruct" : "/sparkproject/streamingResult"
+	"streaming_validation_file_path_toConstruct" : "/sparkproject/streamingResult",
+	"validation_result":"/sparkproject/batchrec/result.txt"
 }

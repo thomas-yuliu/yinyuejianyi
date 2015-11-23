@@ -40,6 +40,12 @@ bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.Str
 
 
 
+# test mappartition
+bin/spark-submit --class TestMapPartition --master spark://c6401.ambari.apache.org:7077 --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+
+
+
 
 # for streaming
 sudo su -
@@ -74,21 +80,22 @@ cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves ~/ambari-vagrant/centos6.4
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties ~/ambari-vagrant/centos6.4/
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf ~/ambari-vagrant/centos6.4/
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh ~/ambari-vagrant/centos6.4/
-
+cp /sparkproject/testMapPartition.txt ~/ambari-vagrant/centos6.4/
 
 # then on vm 
 sudo su -
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
-yes | cp /vagrant/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar .
-yes | cp /vagrant/generateDailyEvents.sh .
+yes | cp /vagrant/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar $INSTALL_LOCATION
+yes | cp /vagrant/generateDailyEvents.sh $INSTALL_LOCATION
 ./generateDailyEvents.sh
 mkdir config
 yes | cp /vagrant/recommenderConfig.json config
-yes | cp /vagrant/spark-defaults.conf /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
-yes | cp /vagrant/spark-env.sh /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
-yes | cp /vagrant/log4j.properties /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
-yes | cp /vagrant/slaves /sparkproject/spark-1.5.1-bin-hadoop2.6/conf
+yes | cp /vagrant/spark-defaults.conf $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+yes | cp /vagrant/spark-env.sh $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+yes | cp /vagrant/log4j.properties $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+yes | cp /vagrant/slaves $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+yes | cp /vagrant/testMapPartition.txt $INSTALL_LOCATION
 #cp /vagrant/acc* .
 #cp /vagrant/daily* .
 mkdir $INSTALL_LOCATION/sparkeventlogs
@@ -100,8 +107,10 @@ cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
 sbin/start-all.sh
 #manually enter password 'vagrant' for all hosts for now
 
+sbin/stop-all.sh
+
 # vm make space
-rm -rf /sparkproject/spark-1.5.1-bin-hadoop2.6/work/*
+rm -rf $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/work/*
 
 #clean up input files
 rm -f accumulatedRatings-new*

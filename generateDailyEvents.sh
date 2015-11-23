@@ -24,8 +24,9 @@
 #
 filename=daily_user_track_event_;
 directory=/sparkproject/
-finalfilelimit=2000000000;  #2GB
-numOfTargetFile=10
+#finalfilelimit=2000000000;  #2GB
+finalfilelimit=500000000;  #1GB
+numOfTargetFile=10	#real number is this + 1
 
 #
 # generate stub file
@@ -33,7 +34,9 @@ numOfTargetFile=10
 stubfilename=stub.txt
 rm $stubfilename;
 touch $stubfilename;
-stubfilelimit=1000;  #1KB
+stubfilelimit=100000;  #100KB. we need a large pool. 
+#otherwise every user is duplicated too many times, so every user too many events
+#which is not realistic and cause memory problem in our app
 stubfilesize=$(wc -c <"$stubfilename");
 
 while [ $stubfilesize -le $stubfilelimit ];
@@ -59,7 +62,7 @@ echo 'stub file generated'
 intermediatefilename=intermediate.txt
 rm $intermediatefilename
 touch $intermediatefilename
-for i in {1..2000} #make intermediate file 2MB
+for i in {1..2000} #make intermediate file 200MB
 do
 	cat $stubfilename >> $intermediatefilename
 done;
