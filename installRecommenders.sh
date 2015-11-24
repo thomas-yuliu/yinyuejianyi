@@ -3,10 +3,83 @@
 # to install recommenders on google compute engine
 
 
+
+# on google engine
+resize your machine first
+then enable ssh key less access among nodes:
+
+eval `ssh-agent`
+ssh-add ~/.ssh/google_compute_engine
+
+
+
+sudo su -
+export INSTALL_LOCATION=/sparkproject
+mkdir $INSTALL_LOCATION
+chmod 777 $INSTALL_LOCATION
+exit
+export INSTALL_LOCATION=/sparkproject
+mkdir ($INSTALL_LOCATION)/sparkeventlogs
+cd $INSTALL_LOCATION
+mkdir config
+yum install java-1.7.0-openjdk -y
+export JAVA_HOME=/usr/lib/jvm/jre-1.7.0-openjdk.x86_64/
+yum install wget -y
+wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz
+tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
+./generateDailyEvents.sh
+
+
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION
+./generateDailyEvents.sh
+
+
+#on master only
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
+sbin/start-all.sh
+
+
+
 # run from your desktop
 
-gcloud compute copy-files daily_user_track_event_00*.txt try-deploy-2:/sparkproject --zone us-central1-b
-gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config  try-deploy-2:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  instance-1:/sparkproject/config --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/generateDailyEvents.sh  instance-1:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar instance-1:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves instance-1:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties instance-1:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf instance-1:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh instance-1:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  instance-2:/sparkproject/config --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/generateDailyEvents.sh  instance-2:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar instance-2:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+
+
+
+
+# run from the GCE
+# standalone cluster batch rec
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
+bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+# standalone cluster model trainer
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
+bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+# standalone streaming rec
+export INSTALL_LOCATION=/sparkproject
+cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
+bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+
+
 
 
 
@@ -25,16 +98,21 @@ tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
 
 
 
+
+
 # run from the VM
 # standalone cluster batch rec
+export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
 bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://c6401.ambari.apache.org:7077  --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone cluster model trainer
+export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
 bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://c6401.ambari.apache.org:7077  --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone streaming rec
+export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
 bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://c6401.ambari.apache.org:7077 --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
