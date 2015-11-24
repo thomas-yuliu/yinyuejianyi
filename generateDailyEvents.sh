@@ -25,7 +25,7 @@
 filename=daily_user_track_event_;
 directory=/sparkproject/
 finalfilelimit=2000000000;  #2GB
-numOfTargetFile=10	#real number is this + 1
+numOfTargetFile=3	#real number is this + 1
 
 #
 # generate stub file

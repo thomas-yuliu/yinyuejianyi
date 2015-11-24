@@ -48,8 +48,8 @@ object BatchRecommender {
     val userIdRightEventTuples = eventTuples.mapPartitionsWithIndex((index, itr) => {
       val rangeBottom = (index * 60000000 / 10).toLong //60M/10
       val randomGenerator = scala.util.Random
-      val randomUserId = rangeBottom + randomGenerator.nextDouble * 60000000 / 10
-      
+      val randomUserId = (rangeBottom + randomGenerator.nextDouble * 60000000 / 10).toLong
+      //need to put to long to get rid of decimals
       val resultItr = itr
       .map(next => (randomUserId.toString,next._2,next._3,next._4,next._5,next._6))
       
@@ -73,8 +73,8 @@ object BatchRecommender {
       }
       val msPlayed = event._4.toDouble
       val weight = reasonWeight * msPlayed*/
-      val weight = 2
-      (event._1, event._2, weight)
+      val weight = event._1.toLong / 6000000
+      (event._1, event._2, weight.toDouble)
     }
     
     val eventWithWeight = userIdRightEventTuplesB.map(calculateWeightForEvent)
@@ -92,12 +92,16 @@ object BatchRecommender {
     
     def mockTrackVector(trackId: String) = {
       //we don't have sparkey file and library, just mock a vector of same dimension
-      val randomGenerator = scala.util.Random //need to be moved to partition level
+      /*val randomGenerator = scala.util.Random //need to be moved to partition level
       val dimension1 = randomGenerator.nextInt(100)
       val dimension2 = randomGenerator.nextInt(100)
       val dimension3 = randomGenerator.nextInt(100)
-      val dimension4 = randomGenerator.nextInt(100)
-      (trackId, dimension1, dimension2, dimension3, dimension4)
+      val dimension4 = randomGenerator.nextInt(100)*/
+      val dimension1 = trackId.toLong / 277
+      val dimension2 = trackId.toLong / 483
+      val dimension3 = trackId.toLong / 399
+      val dimension4 = trackId.toLong / 571
+      (trackId, dimension1.toInt, dimension2.toInt, dimension3.toInt, dimension4.toInt)
     }
     /*
     //mock fetching item vector for the track from Sparkey
@@ -113,17 +117,18 @@ object BatchRecommender {
     finalresult.foreach(ele => println(ele._1 + ',' + ele._2 + ',' + ele._3 + ',' + ele._4))
     */
     //groupby user within the partition
+    /*
     val groupedbyUser = eventWithWeightB.mapPartitions(itr => {
       var fruits = itr.toArray
       val groupedby = fruits.groupBy(_._1)
       fruits = Array()
       groupedby.iterator
-      /*val map = Map[String, ListBuffer[(String, String, Double, (String, Int, Int, Int, Int))]]()
-      val newitr = itr.map(item => {
+      //val map = Map[String, ListBuffer[(String, String, Double, (String, Int, Int, Int, Int))]]()
+      //val newitr = itr.map(item => {
         //Array[(String, String, Double, (String, Int, Int, Int, Int))]
-        (item._1, Array((item._1, item._2, 1.0, (item._2,1,1,1,1))))
-      })
-      newitr*/
+        //(item._1, Array((item._1, item._2, 1.0, (item._2,1,1,1,1))))
+      //})
+      //newitr
     }, true)
     
     //progress logs
@@ -131,34 +136,36 @@ object BatchRecommender {
       println("progress: groupedby for each user in partition " + partitionId)
       itr
     }, true)
-    
+    */
     def mockLatency() = {
        Thread sleep 10 //10ms
     }
     
-    //fetch rec for each event from ANNOY and maintain top 30
-    val top30RecPerUser = groupedbyUserB.map( userAndTracks => {
-      //fetch list of tracks/events for this user
-      val tracks = userAndTracks._2
-      var top30 = ListBuffer[(String,Double)]()
-      tracks.foreach(track => {
+    val top20RecPerUser = eventWithWeightB.mapPartitions(itr => {
+      
+      val top20 = Map[String, Array[(String,Double)]]()
+      
+      while(itr.hasNext){
+        val event = itr.next()
+        
         //mock fetching track vector for this track from Sparkey
-        val mockVector = mockTrackVector(track._2)
+        val mockVector = mockTrackVector(event._2)
         
         //mock fetching rec tracks for this track from ANNOY
         var recForThisTrack = new Array[(String, Int, Int, Int, Int, Int)](10)
         
-        def mockOneRecVector() = {
+        def mockOneRecVector(randomNum: String) = {
           //since we don't hae ANNOY, we mock rec vectors from it
-          val randomGenerator = scala.util.Random
+          //val randomGenerator = scala.util.Random
           //generate a random vector first, passing random vec ID
-          val recVector = mockTrackVector(randomGenerator.nextInt(100).toString())
+          //val recVector = mockTrackVector(randomGenerator.nextInt(100).toString())
+          val recVector = mockTrackVector(randomNum)
           //generate a cosine similarity score in the end, and return the whole vector
-          (recVector._1, recVector._2, recVector._3, recVector._4, recVector._5, randomGenerator.nextInt(100))
+          (recVector._1, recVector._2, recVector._3, recVector._4, recVector._5, (randomNum.toLong/103).toInt)
         }
         
         for(a <- 0 to 9){
-          recForThisTrack(a) = mockOneRecVector()
+          recForThisTrack(a) = mockOneRecVector(event._2)
         }
         //mock filtering through bloom filter and dismiss filter
         var afterDismissFiler = recForThisTrack.filter(element => {
@@ -169,35 +176,34 @@ object BatchRecommender {
         //mock calculating rec score with weight and cosine similarity
         var afterCalculatedRecScore = afterDismissFiler.map(recVector => {
           //don't need anything but the track id and the rec score to reduce memory consumption
-          (recVector._1, recVector._6 * track._3.toDouble)//track._3 is weight
+          (recVector._1, recVector._6 * event._3.toDouble)//track._3 is weight
         })
-        top30 ++= afterCalculatedRecScore
-        //free up memory
-        recForThisTrack = Array()
-        afterDismissFiler = Array()
-        afterCalculatedRecScore = Array()
-        //only need the highest 30
-        top30 = top30.sortBy(_._2).take(30)
-      //end of foreach
-      })
+        if(top20.contains(event._1)){
+          val existing = top20.get(event._1).get
+          val newArray = afterCalculatedRecScore ++ existing
+          val sortedArray = newArray.sortBy(_._2).take(20)
+          top20.put(event._1, sortedArray)
+        } else {
+          top20.put(event._1, afterCalculatedRecScore)
+        }
+      }
       
-      (userAndTracks._1,top30)
-    //end of map
-    }).persist(StorageLevel.DISK_ONLY_2)
+      top20.iterator
+    }, true).persist(StorageLevel.DISK_ONLY_2)
     
     //progress logs
-    val top30RecPerUserB = top30RecPerUser.mapPartitionsWithIndex((partitionId,itr) => {
-      println("progress: top30 built for each user in partition " + partitionId)
+    val top20RecPerUserB = top20RecPerUser.mapPartitionsWithIndex((partitionId,itr) => {
+      println("progress: top20 built for each user in partition " + partitionId)
       itr
     }, true)
     
     //mock fetch previous day's batch rec from cassandra
-    val mergedWithBatchRec = top30RecPerUserB.map( userAndRecs =>{
+    val mergedWithBatchRec = top20RecPerUserB.map( userAndRecs =>{
       val userId = userAndRecs._1
       val recs = userAndRecs._2
       //mock fetching from cassandra. just to leave some latency here
       val bloomfilterFilesPath = "/sparkproject/config/recommenderConfig.json"
-      recs ++= recs
+      //recs ++= recs
       //mock filtering through bloom filter and dismiss filter. just to leave some latency here
       mockLatency
       (userId, recs)
@@ -217,9 +223,8 @@ object BatchRecommender {
       //mock reading diversity factor from DB. just to leave some latency here
       mockLatency
       //mock calculating diversity score
-      val randomGenerator = scala.util.Random
       val updated = recs.map(rec => {
-        (rec._1, rec._2 * randomGenerator.nextDouble())
+        (rec._1, (userId.toLong/rec._2).toDouble)
       })
       (userId, updated)
     } }
@@ -227,9 +232,9 @@ object BatchRecommender {
     .map(userAndRecs =>{
       val userId = userAndRecs._1
       val recs = userAndRecs._2
-      val top30 = recs.sortBy(_._2)//_2 is rec score
+      val top20 = recs.sortBy(_._2)//_2 is rec score
       .take(30)
-      (userId, top30)
+      (userId, top20)
     }
     )
     
