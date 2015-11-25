@@ -137,8 +137,18 @@ object BatchRecommender {
       itr
     }, true)
     */
-    def mockLatency() = {
-       Thread sleep 10 //10ms
+    //just for latency
+    val installation_path = sys.env("INSTALL_LOCATION")
+    var targetfilepath = installation_path + "/config/recommenderConfig.json"
+  
+    def mockLatency(length: Int) = {
+       //Thread sleep length
+      val file = new File(targetfilepath)
+      val bw = new BufferedReader(new FileReader(file))
+      for(a <- 1 to length){
+       val line = bw.readLine()
+      }
+      bw.close()
     }
     
     val top20RecPerUser = eventWithWeightB.mapPartitions(itr => {
@@ -164,13 +174,15 @@ object BatchRecommender {
           (recVector._1, recVector._2, recVector._3, recVector._4, recVector._5, (randomNum.toLong/103).toInt)
         }
         
+        //mock ANNOY latency
+        mockLatency(20)
         for(a <- 0 to 9){
-          recForThisTrack(a) = mockOneRecVector(event._2)
+          recForThisTrack(a) = mockOneRecVector(event._2)  
         }
         //mock filtering through bloom filter and dismiss filter
         var afterDismissFiler = recForThisTrack.filter(element => {
-          //just to leave some latency here
-          mockLatency
+          //caching bloom filter and dismiss in memory. latency is neglectable
+          //hard to find a latency below 1ms so put the latency up in ANNOY
           2 == 2
         })
         //mock calculating rec score with weight and cosine similarity
@@ -181,12 +193,14 @@ object BatchRecommender {
         if(top20.contains(event._1)){
           val existing = top20.get(event._1).get
           val newArray = afterCalculatedRecScore ++ existing
-          val sortedArray = newArray.sortBy(_._2).take(20)
+          val sortedArray = newArray.sortBy(_._2).take(30)
           top20.put(event._1, sortedArray)
         } else {
           top20.put(event._1, afterCalculatedRecScore)
         }
       }
+      
+      println("top20 for users " + top20.toString())
       
       top20.iterator
     }, true).persist(StorageLevel.DISK_ONLY_2)
@@ -201,12 +215,14 @@ object BatchRecommender {
     val mergedWithBatchRec = top20RecPerUserB.map( userAndRecs =>{
       val userId = userAndRecs._1
       val recs = userAndRecs._2
-      //mock fetching from cassandra. just to leave some latency here
-      val bloomfilterFilesPath = "/sparkproject/config/recommenderConfig.json"
-      //recs ++= recs
-      //mock filtering through bloom filter and dismiss filter. just to leave some latency here
-      mockLatency
-      (userId, recs)
+      //mock fetching from cassandra
+      val allrecs = recs ++ recs
+      //mock filtering through bloom filter and dismiss filter
+      //mockLatency(1)
+      //caching bloom filter and dismiss in memory. latency is neglectable
+      val afterfiltering = allrecs.filter(ele => 2==2)
+      //hard to find a latency below 1ms so put the latency up in ANNOY
+      (userId, afterfiltering)
     })
     
     //progress logs
@@ -220,8 +236,8 @@ object BatchRecommender {
     .map { userAndRecs =>{
       val userId = userAndRecs._1
       val recs = userAndRecs._2
-      //mock reading diversity factor from DB. just to leave some latency here
-      mockLatency
+      //caching bloom filter and dismiss in memory. latency is neglectable
+      //hard to find a latency below 1ms so put the latency up in ANNOY
       //mock calculating diversity score
       val updated = recs.map(rec => {
         (rec._1, (userId.toLong/rec._2).toDouble)
@@ -233,29 +249,34 @@ object BatchRecommender {
       val userId = userAndRecs._1
       val recs = userAndRecs._2
       val top20 = recs.sortBy(_._2)//_2 is rec score
-      .take(30)
+      .take(20)
       (userId, top20)
     }
     )
     
     //mock storing the value to cassandra table
     val appId = sc.applicationId
+    var validation_result = ConfigLoader.query("validation_result")
+    //overwriting input file location in local test
+    if (args.length > 0 && args(0).equals("test")){
+      validation_result = "/sparkproject/localtest/result"
+    }
+    validation_result = validation_result + appId
+    validation_result += ".txt"
     finalResult.foreachPartition(itr =>{
       println("finalresult: ")
-      var validation_result = ConfigLoader.query("validation_result")
-      //overwriting input file location in local test
-      if (args.length > 0 && args(0).equals("test")){
-        validation_result = "/sparkproject/localtest/result.txt"
-      }
-      validation_result = validation_result + appId
       val file = new File(validation_result)
-      val bw = new BufferedWriter(new FileWriter(file))
-      itr.foreach(each => {
+      val bw = new BufferedWriter(new FileWriter(file, true))
+      while(itr.hasNext){
+        bw.write(itr.next()._1 + " recs: " + itr.next()._2.toString() + "\n")
+      }
+      bw.close()
+      /*itr.foreach(each => {
         bw.write(each.toString())
         if(!itr.hasNext){
           bw.close()
         }
-      })
+      })*/
     })
   }
 }

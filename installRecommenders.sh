@@ -27,6 +27,7 @@ export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
 mkdir config
 mkdir sparkeventlogs
+mkdir batchrec
 yum install java-1.7.0-openjdk -y
 export JAVA_HOME=/usr/lib/jvm/jre-1.7.0-openjdk.x86_64/
 yum install wget -y
@@ -85,6 +86,8 @@ bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.Str
 
 
 
+
+
 # to install recommenders on CentosOS6.4
 sudo su -
 yum install java-1.7.0-openjdk -y
@@ -93,11 +96,10 @@ export INSTALL_LOCATION=/sparkproject
 yum install wget -y
 mkdir $INSTALL_LOCATION
 mkdir ($INSTALL_LOCATION)/sparkeventlogs
+mkdir ($INSTALL_LOCATION)/batchrec
 cd $INSTALL_LOCATION
 wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz
 tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
-
-
 
 
 
