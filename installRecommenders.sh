@@ -35,7 +35,6 @@ wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz
 tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
 ./generateDailyEvents.sh
 
-
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
 ./generateDailyEvents.sh
@@ -49,7 +48,6 @@ sbin/start-all.sh
 
 
 # run from your desktop
-
 gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  instance-1:/sparkproject/config --zone us-central1-b
 gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/generateDailyEvents.sh  instance-1:/sparkproject --zone us-central1-b
 gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/target/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar instance-1:/sparkproject --zone us-central1-b
@@ -67,24 +65,25 @@ gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.
 
 
 
-
 # run from the GCE
 # standalone cluster batch rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 10G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone cluster model trainer
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 5G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone streaming rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 5G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 
+
+============================================================================================================
 
 
 
@@ -119,11 +118,8 @@ export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
 bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://c6401.ambari.apache.org:7077 --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
-
-
 # test mappartition
 bin/spark-submit --class TestNoMapPartition --master spark://c6401.ambari.apache.org:7077 --executor-memory 5G --total-executor-cores 3 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
-
 
 
 

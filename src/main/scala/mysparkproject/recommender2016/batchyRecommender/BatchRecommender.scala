@@ -31,8 +31,7 @@ object BatchRecommender {
         classOf[LongWritable],  
         classOf[Text], 4)
         .map(_._2.toString())
-    //val eventLines = sc.textFile(eventFiles, 4) //in real case, num of partitions determined by inputformat
-
+    
     //parse daily ratings into tuple
     val eventTuples = eventLines.map(line => line.split(",") match {
       case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
@@ -48,10 +47,12 @@ object BatchRecommender {
     val userIdRightEventTuples = eventTuples.mapPartitionsWithIndex((index, itr) => {
       val rangeBottom = (index * 60000000 / 10).toLong //60M/10
       val randomGenerator = scala.util.Random
-      val randomUserId = (rangeBottom + randomGenerator.nextDouble * 60000000 / 10).toLong
-      //need to put to long to get rid of decimals
       val resultItr = itr
-      .map(next => (randomUserId.toString,next._2,next._3,next._4,next._5,next._6))
+      .map(next => {
+      //need to put to long to get rid of decimals
+      val randomUserId = (rangeBottom + randomGenerator.nextDouble * 60000000 / 10).toLong
+      (randomUserId.toString,next._2,next._3,next._4,next._5,next._6)
+      })
       
       resultItr
     }, true)
@@ -91,68 +92,34 @@ object BatchRecommender {
     }, true)
     
     def mockTrackVector(trackId: String) = {
-      //we don't have sparkey file and library, just mock a vector of same dimension
-      /*val randomGenerator = scala.util.Random //need to be moved to partition level
-      val dimension1 = randomGenerator.nextInt(100)
-      val dimension2 = randomGenerator.nextInt(100)
-      val dimension3 = randomGenerator.nextInt(100)
-      val dimension4 = randomGenerator.nextInt(100)*/
       val dimension1 = trackId.toLong / 277
       val dimension2 = trackId.toLong / 483
       val dimension3 = trackId.toLong / 399
       val dimension4 = trackId.toLong / 571
       (trackId, dimension1.toInt, dimension2.toInt, dimension3.toInt, dimension4.toInt)
     }
-    /*
-    //mock fetching item vector for the track from Sparkey
-     * for now this is moved after groupby
-    val eventWithVectorAndWeight = eventWithWeightB.map(event =>
-      //user id, track id, weight, item vectors
-      (event._1, event._2, event._3, mockTrackVector(event._2)))
-      * */
-      
-    /*//validation of vector fetching
-    val finalresult = eventWithVectorAndWeight.collect()
-    println("finalresult:")
-    finalresult.foreach(ele => println(ele._1 + ',' + ele._2 + ',' + ele._3 + ',' + ele._4))
-    */
-    //groupby user within the partition
-    /*
-    val groupedbyUser = eventWithWeightB.mapPartitions(itr => {
-      var fruits = itr.toArray
-      val groupedby = fruits.groupBy(_._1)
-      fruits = Array()
-      groupedby.iterator
-      //val map = Map[String, ListBuffer[(String, String, Double, (String, Int, Int, Int, Int))]]()
-      //val newitr = itr.map(item => {
-        //Array[(String, String, Double, (String, Int, Int, Int, Int))]
-        //(item._1, Array((item._1, item._2, 1.0, (item._2,1,1,1,1))))
-      //})
-      //newitr
-    }, true)
-    
-    //progress logs
-    val groupedbyUserB = groupedbyUser.mapPartitionsWithIndex((partitionId,itr) => {
-      println("progress: groupedby for each user in partition " + partitionId)
-      itr
-    }, true)
-    */
+
     //just for latency
     val installation_path = sys.env("INSTALL_LOCATION")
     var targetfilepath = installation_path + "/config/recommenderConfig.json"
   
     def mockLatency(length: Int) = {
        //Thread sleep length
-      val file = new File(targetfilepath)
-      val bw = new BufferedReader(new FileReader(file))
+      /* focusing on GC for now
       for(a <- 1 to length){
-       val line = bw.readLine()
+        val file = new File(targetfilepath)
+        val bw = new BufferedReader(new FileReader(file))
+        val line = bw.readLine()
+        bw.close()
       }
-      bw.close()
+      * */
     }
     
+    var numOfRecsToKeep = ConfigLoader.query("num_of_top_rec_to_keep")
+    
     val top20RecPerUser = eventWithWeightB.mapPartitions(itr => {
-      
+      //in real case, we will use spillable to disk map
+      //now we use top1 to mock
       val top20 = Map[String, Array[(String,Double)]]()
       
       while(itr.hasNext){
@@ -175,7 +142,7 @@ object BatchRecommender {
         }
         
         //mock ANNOY latency
-        mockLatency(20)
+        mockLatency(5)
         for(a <- 0 to 9){
           recForThisTrack(a) = mockOneRecVector(event._2)  
         }
@@ -191,16 +158,25 @@ object BatchRecommender {
           (recVector._1, recVector._6 * event._3.toDouble)//track._3 is weight
         })
         if(top20.contains(event._1)){
+          
+          //println("contains: " + event._1)
+          
           val existing = top20.get(event._1).get
           val newArray = afterCalculatedRecScore ++ existing
-          val sortedArray = newArray.sortBy(_._2).take(30)
+          val sortedArray = newArray.sortBy(_._2).take(numOfRecsToKeep.toInt)
+          
+          //mock reading/writing to disk
+          mockLatency(2)
           top20.put(event._1, sortedArray)
         } else {
+          
+          //println("doesn't contain: " + event._1)
+          
+          //mock reading/writing to disk
+          mockLatency(2)
           top20.put(event._1, afterCalculatedRecScore)
         }
       }
-      
-      println("top20 for users " + top20.toString())
       
       top20.iterator
     }, true).persist(StorageLevel.DISK_ONLY_2)
@@ -218,7 +194,7 @@ object BatchRecommender {
       //mock fetching from cassandra
       val allrecs = recs ++ recs
       //mock filtering through bloom filter and dismiss filter
-      //mockLatency(1)
+      mockLatency(1)
       //caching bloom filter and dismiss in memory. latency is neglectable
       val afterfiltering = allrecs.filter(ele => 2==2)
       //hard to find a latency below 1ms so put the latency up in ANNOY
@@ -249,7 +225,7 @@ object BatchRecommender {
       val userId = userAndRecs._1
       val recs = userAndRecs._2
       val top20 = recs.sortBy(_._2)//_2 is rec score
-      .take(20)
+      .take(numOfRecsToKeep.toInt)
       (userId, top20)
     }
     )
@@ -268,7 +244,8 @@ object BatchRecommender {
       val file = new File(validation_result)
       val bw = new BufferedWriter(new FileWriter(file, true))
       while(itr.hasNext){
-        bw.write(itr.next()._1 + " recs: " + itr.next()._2.toString() + "\n")
+        val next = itr.next()
+        bw.write(next._1 + " recs: " + next._2.toString() + "\n")
       }
       bw.close()
       /*itr.foreach(each => {

@@ -5,5 +5,6 @@
 	"updated_accumulated_rating_file_path_toConstruct" : "/sparkproject/accumulatedRatings-new-001-00",
 	"daily_rating_kafka_topic" : "test",
 	"streaming_validation_file_path_toConstruct" : "/sparkproject/streamingResult",
-	"validation_result":"/sparkproject/batchrec/result"
+	"validation_result":"/sparkproject/batchrec/result",
+	"num_of_top_rec_to_keep":1
 }
