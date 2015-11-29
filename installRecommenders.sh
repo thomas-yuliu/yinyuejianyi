@@ -43,6 +43,7 @@ cd $INSTALL_LOCATION
 #on master only
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
+sbin/stop-all.sh
 sbin/start-all.sh
 
 
@@ -69,17 +70,17 @@ gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.
 # standalone cluster batch rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone cluster model trainer
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone streaming rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 
 

@@ -45,14 +45,12 @@ object BatchRecommender {
     */
     //mock a user id to make the rating's user id within this partition's user id range
     val userIdRightEventTuples = eventTuples.mapPartitionsWithIndex((index, itr) => {
-      val rangeBottom = (index * 60000000 / 10).toLong //60M/10
       val randomGenerator = scala.util.Random
-      val resultItr = itr
-      .map(next => {
+      val resultItr = itr.map(next => 
       //need to put to long to get rid of decimals
-      val randomUserId = (rangeBottom + randomGenerator.nextDouble * 60000000 / 10).toLong
-      (randomUserId.toString,next._2,next._3,next._4,next._5,next._6)
-      })
+      (((index * 60000000 / 10).toLong + randomGenerator.nextDouble * 60000000 / 10).toLong.toString,
+          next._2,next._3,next._4,next._5,next._6)
+      )
       
       resultItr
     }, true)
@@ -74,8 +72,8 @@ object BatchRecommender {
       }
       val msPlayed = event._4.toDouble
       val weight = reasonWeight * msPlayed*/
-      val weight = event._1.toLong / 6000000
-      (event._1, event._2, weight.toDouble)
+      //some memory leak in the code above. ignore it. just mock weight calculation
+      (event._1, event._2, (event._1.toLong / 6000000).toDouble)
     }
     
     val eventWithWeight = userIdRightEventTuplesB.map(calculateWeightForEvent)
@@ -91,28 +89,23 @@ object BatchRecommender {
       itr
     }, true)
     
-    def mockTrackVector(trackId: String) = {
-      val dimension1 = trackId.toLong / 277
-      val dimension2 = trackId.toLong / 483
-      val dimension3 = trackId.toLong / 399
-      val dimension4 = trackId.toLong / 571
-      (trackId, dimension1.toInt, dimension2.toInt, dimension3.toInt, dimension4.toInt)
+    def mockTrackVector(trackId: Long) = {
+      (trackId, (trackId / 277).toInt, (trackId / 483).toInt, (trackId / 399).toInt, (trackId / 571).toInt)
     }
 
     //just for latency
-    val installation_path = sys.env("INSTALL_LOCATION")
-    var targetfilepath = installation_path + "/config/recommenderConfig.json"
+    val targetfilepath = sys.env("INSTALL_LOCATION") + "/config/recommenderConfig.json"
   
     def mockLatency(length: Int) = {
        //Thread sleep length
-      /* focusing on GC for now
+      
       for(a <- 1 to length){
         val file = new File(targetfilepath)
         val bw = new BufferedReader(new FileReader(file))
         val line = bw.readLine()
         bw.close()
       }
-      * */
+      
     }
     
     var numOfRecsToKeep = ConfigLoader.query("num_of_top_rec_to_keep")
@@ -126,25 +119,21 @@ object BatchRecommender {
         val event = itr.next()
         
         //mock fetching track vector for this track from Sparkey
-        val mockVector = mockTrackVector(event._2)
+        val mockVector = mockTrackVector(event._2.toLong)
         
         //mock fetching rec tracks for this track from ANNOY
         var recForThisTrack = new Array[(String, Int, Int, Int, Int, Int)](10)
         
-        def mockOneRecVector(randomNum: String) = {
+        def mockOneRecVector(trackId: Long) = {
           //since we don't hae ANNOY, we mock rec vectors from it
-          //val randomGenerator = scala.util.Random
-          //generate a random vector first, passing random vec ID
-          //val recVector = mockTrackVector(randomGenerator.nextInt(100).toString())
-          val recVector = mockTrackVector(randomNum)
           //generate a cosine similarity score in the end, and return the whole vector
-          (recVector._1, recVector._2, recVector._3, recVector._4, recVector._5, (randomNum.toLong/103).toInt)
+          (trackId.toString(), (trackId / 277).toInt, (trackId / 483).toInt, (trackId / 399).toInt, (trackId / 571).toInt, (trackId.toLong/103).toInt)
         }
         
         //mock ANNOY latency
         mockLatency(5)
         for(a <- 0 to 9){
-          recForThisTrack(a) = mockOneRecVector(event._2)  
+          recForThisTrack(a) = mockOneRecVector(event._2.toLong)  
         }
         //mock filtering through bloom filter and dismiss filter
         var afterDismissFiler = recForThisTrack.filter(element => {
@@ -189,16 +178,14 @@ object BatchRecommender {
     
     //mock fetch previous day's batch rec from cassandra
     val mergedWithBatchRec = top20RecPerUserB.map( userAndRecs =>{
-      val userId = userAndRecs._1
-      val recs = userAndRecs._2
       //mock fetching from cassandra
-      val allrecs = recs ++ recs
+      val allrecs = userAndRecs._2 ++ userAndRecs._2
       //mock filtering through bloom filter and dismiss filter
       mockLatency(1)
       //caching bloom filter and dismiss in memory. latency is neglectable
       val afterfiltering = allrecs.filter(ele => 2==2)
       //hard to find a latency below 1ms so put the latency up in ANNOY
-      (userId, afterfiltering)
+      (userAndRecs._1, afterfiltering)
     })
     
     //progress logs
@@ -210,23 +197,17 @@ object BatchRecommender {
     val finalResult = mergedWithBatchRecB
     //mock calculating diversity score
     .map { userAndRecs =>{
-      val userId = userAndRecs._1
-      val recs = userAndRecs._2
       //caching bloom filter and dismiss in memory. latency is neglectable
       //hard to find a latency below 1ms so put the latency up in ANNOY
       //mock calculating diversity score
-      val updated = recs.map(rec => {
-        (rec._1, (userId.toLong/rec._2).toDouble)
+      val updated = userAndRecs._2.map(rec => {
+        (rec._1, (userAndRecs._1.toLong/rec._2).toDouble)
       })
-      (userId, updated)
+      (userAndRecs._1, updated)
     } }
     //take top 30 for each user
     .map(userAndRecs =>{
-      val userId = userAndRecs._1
-      val recs = userAndRecs._2
-      val top20 = recs.sortBy(_._2)//_2 is rec score
-      .take(numOfRecsToKeep.toInt)
-      (userId, top20)
+      (userAndRecs._1, userAndRecs._2.sortBy(_._2).take(numOfRecsToKeep.toInt))//_2 is rec score
     }
     )
     

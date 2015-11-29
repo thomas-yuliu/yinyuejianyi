@@ -19,13 +19,26 @@
 # we create the target file by appending the stub file to it multi times
 # until it reaches the file size
 
+# arguments
+script=$1
+
 #
 # target definition
 #
-filename=daily_user_track_event_;
 directory=/sparkproject/
-finalfilelimit=2000000000;  #2GB
 numOfTargetFile=3	#real number is this + 1
+if [script = "daily"]
+then
+	filename=daily_user_track_event_;
+	finalfilelimit=2000000000;  #2GB
+elif [script = "acc"]
+then
+	filename=accumulatedRatings-;
+	finalfilelimit=2200000000;  #2.2GB
+else
+then
+	echo "daily or acc must be specified"
+fi
 
 #
 # generate stub file
@@ -49,8 +62,14 @@ do
 	eventSource="browsing";
 	nextEvent="null";
 	
-	echo $userId,$trackId,$timestamp,$percentage,$eventSource,$nextEvent >> $stubfilename;
-	
+	if [script = "daily"]
+	then
+		echo $userId,$trackId,$timestamp,$percentage,$eventSource,$nextEvent >> $stubfilename;
+	elif [script = "acc"]
+	then
+		rating=$RANDOM
+		echo $userId,$trackId,$timestamp,$rating>> $stubfilename;
+	fi
 	stubfilesize=$(wc -c <"$stubfilename");
 done;
 echo 'stub file generated'
@@ -86,10 +105,25 @@ echo 'target file generated'
 #
 convenience=00
 suffix=".txt"
-for ((i=1; i<=numOfTargetFile; i++));
-do
-	cp $filename $directory$filename$convenience$i$suffix
-done;
-zero=0
-mv $filename $directory$filename$convenience$zero$suffix
+if [script = "daily"]
+then
+	for ((i=1; i<=numOfTargetFile; i++));
+	do
+		cp $filename $directory$filename$convenience$i$suffix
+	done;
+	zero=0
+	mv $filename $directory$filename$convenience$zero$suffix
+elif [script = "acc"]
+then
+	acc_convenience="-00"
+	for ((i=1; i<=numOfTargetFile; i++));
+	do
+		for ((j=1; j<=numOfTargetFile; j++));
+		do
+			cp $filename $directory$filename$convenience$i$acc_convenience$j$suffix
+		done;
+	done;
+	zero=0
+	mv $filename $directory$filename$convenience$zero$suffix
+fi
 echo 'all target files copied'

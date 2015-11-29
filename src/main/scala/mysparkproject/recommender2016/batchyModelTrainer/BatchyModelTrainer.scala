@@ -58,16 +58,18 @@ object batchyModelTrainer {
     val userIdRightEventTuples = ratingsTuples.mapPartitionsWithIndex((index, itr) => {
       val rangeBottom = index * 60000000 / 10 //60M/10
       val randomGenerator = scala.util.Random
-      val fruits = new ListBuffer[(String, String, Long, Double)]()
-      while(itr.hasNext){
-        val next = itr.next()
-        val randomUserId = rangeBottom + randomGenerator.nextInt(60000000/10)
-        val newItem = (randomUserId.toString,next._2,next._3,next._4)
-        fruits += newItem
-      }
-      fruits.iterator
+      
+      val newItr = itr.map(next => {
+        val randomUserId = ((index * 60000000 / 10).toLong + randomGenerator.nextDouble * 60000000 / 10).toLong.toString
+        (randomUserId, (randomUserId.toLong/2).toString(),//just use randomUserId/2 as track id
+            next._3,next._4)
+      })
+      newItr
     }, true)
-    //filter ratings three years ago, tracks listened less than 10 times and not active within 6 months. visit external DB
+    //filter ratings three years ago
+    //filter tracks listened less than 10 times and not active within 6 months.
+    //filter users not so active
+    //need to visit external DB
     val ratingsWithinThreeYears = userIdRightEventTuples.filter { rating => rating._3 > 0 } //mock 3 years here
       .filter(rating => rating._3 > 0) //mock 10 times and 6 months
       .groupBy(rating => rating._1)//should we do on scala level, but not RDD level(to prevent shuffle scheduling)?
@@ -85,7 +87,7 @@ object batchyModelTrainer {
         for(pair <- element._2){
           //compose composite key: user id + track id
           val key = pair._1 + "," + pair._2
-          println("rating merging. building map: " + key + ";" +  (pair._3, pair._4))
+          //println("rating merging. building map: " + key + ";" +  (pair._3, pair._4))
           accMap.put(key,(pair._3, pair._4))
         }
       }
@@ -101,7 +103,6 @@ object batchyModelTrainer {
       println("rating merging. reading daily event partition file at: " + partitionFileName)
       val rangeBottom = index * 60000000 / 10 //60M/10
       val randomGenerator = scala.util.Random
-      var events = List[(String, String, String, String, String, String)]()
       if(Files.exists(Paths.get(partitionFileName))){
         for (line <- Source.fromFile(partitionFileName).getLines()) {
           val event = line.split(",") match {
@@ -118,7 +119,7 @@ object batchyModelTrainer {
           val key = newItem._1+","+newItem._2
           val previousScoreAndTime = accMap.getOrElse(key, (0,0D))
           accMap.put(key, (newItem._3, previousScoreAndTime._2 + thisEventScore))
-          println("rating merging. " + key + " current score: " + previousScoreAndTime + " new record: " + newItem + " new score:" + (newItem._3, previousScoreAndTime._2 + thisEventScore))
+          //println("rating merging. " + key + " current score: " + previousScoreAndTime + " new record: " + newItem + " new score:" + (newItem._3, previousScoreAndTime._2 + thisEventScore))
         }
       }
       accMap.iterator
@@ -126,8 +127,7 @@ object batchyModelTrainer {
     , true)
         
     //in the form of userid -> (list of acc ratings, list of daily events)
-    ratingsWithDailyRating.cache()
-    ratingsWithDailyRating.foreach { case (k, v) => println("rating merging. key: " + k + " value: " + v.toString()) }
+    //ratingsWithDailyRating.foreach { case (k, v) => println("rating merging. key: " + k + " value: " + v.toString()) }
 
     //filter tracks listened less than 10 times or not active within 6 months. visit external DB
     val activeRatings = ratingsWithDailyRating.filter(rating => rating._1 != "") //mock 10 & 6 here
