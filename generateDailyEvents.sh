@@ -27,16 +27,15 @@ script=$1
 #
 directory=/sparkproject/
 numOfTargetFile=3	#real number is this + 1
-if [script = "daily"]
+if [ "$script" == "daily" ]
 then
 	filename=daily_user_track_event_;
 	finalfilelimit=2000000000;  #2GB
-elif [script = "acc"]
+elif [ "$script" == "acc" ]
 then
 	filename=accumulatedRatings-;
 	finalfilelimit=2200000000;  #2.2GB
 else
-then
 	echo "daily or acc must be specified"
 fi
 
@@ -62,10 +61,10 @@ do
 	eventSource="browsing";
 	nextEvent="null";
 	
-	if [script = "daily"]
+	if [ "$script" == "daily" ]
 	then
 		echo $userId,$trackId,$timestamp,$percentage,$eventSource,$nextEvent >> $stubfilename;
-	elif [script = "acc"]
+	elif [ "$script" == "acc" ]
 	then
 		rating=$RANDOM
 		echo $userId,$trackId,$timestamp,$rating>> $stubfilename;
@@ -105,7 +104,7 @@ echo 'target file generated'
 #
 convenience=00
 suffix=".txt"
-if [script = "daily"]
+if [ "$script" == "daily" ]
 then
 	for ((i=1; i<=numOfTargetFile; i++));
 	do
@@ -113,7 +112,7 @@ then
 	done;
 	zero=0
 	mv $filename $directory$filename$convenience$zero$suffix
-elif [script = "acc"]
+elif [ "$script" == "acc" ]
 then
 	acc_convenience="-00"
 	for ((i=1; i<=numOfTargetFile; i++));
@@ -124,6 +123,6 @@ then
 		done;
 	done;
 	zero=0
-	mv $filename $directory$filename$convenience$zero$suffix
+	mv $filename $directory$filename$convenience$zero$acc_convenience$zero$suffix
 fi
 echo 'all target files copied'
