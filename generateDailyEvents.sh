@@ -26,7 +26,7 @@ script=$1
 # target definition
 #
 directory=/sparkproject/
-numOfTargetFile=3	#real number is this + 1
+numOfTargetFile=91	#real number is this + 1
 if [ "$script" == "daily" ]
 then
 	filename=daily_user_track_event_;
@@ -34,9 +34,10 @@ then
 elif [ "$script" == "acc" ]
 then
 	filename=accumulatedRatings-;
-	finalfilelimit=2200000000;  #2.2GB
+	finalfilelimit=1100000000;  #1.1GB
 else
 	echo "daily or acc must be specified"
+	exit 1
 fi
 
 #

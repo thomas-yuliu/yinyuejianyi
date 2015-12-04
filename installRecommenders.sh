@@ -33,11 +33,13 @@ export JAVA_HOME=/usr/lib/jvm/jre-1.7.0-openjdk.x86_64/
 yum install wget -y
 wget http://d3kbcqa49mib13.cloudfront.net/spark-1.5.1-bin-hadoop2.6.tgz
 tar zxvf spark-1.5.1-bin-hadoop2.6.tgz
-./generateDailyEvents.sh
+./generateDailyEvents.sh daily
+./generateDailyEvents.sh acc
 
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
-./generateDailyEvents.sh
+./generateDailyEvents.sh daily
+./generateDailyEvents.sh acc
 
 
 #on master only
@@ -64,23 +66,37 @@ gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.prop
 gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
 gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh instance-2:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
 
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  instance-3:/sparkproject/config --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/generateDailyEvents.sh  instance-3:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves instance-3:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties instance-3:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf instance-3:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh instance-3:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/config/recommenderConfig.json  instance-4:/sparkproject/config --zone us-central1-b
+gcloud compute copy-files ~/mavenWorkspace/spark-project/musicRecommender/generateDailyEvents.sh  instance-4:/sparkproject --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves instance-4:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties instance-4:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf instance-4:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+gcloud compute copy-files ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh instance-4:/sparkproject/spark-1.5.1-bin-hadoop2.6/conf/ --zone us-central1-b
+
 
 
 # run from the GCE
 # standalone cluster batch rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyRecommender.BatchRecommender --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone cluster model trainer
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.batchyModelTrainer.batchyModelTrainer --master spark://instance-1:7077  --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 # standalone streaming rec
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6
-bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 8G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
+bin/spark-submit --class mysparkproject.recommender2016.streamingRecommender.StreamingRecommender --master spark://instance-1:7077 --executor-memory 6G --total-executor-cores 2 ../musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar
 
 
 
@@ -158,22 +174,31 @@ cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/slaves ~/ambari-vagrant/centos6.4
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/log4j.properties ~/ambari-vagrant/centos6.4/
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-defaults.conf ~/ambari-vagrant/centos6.4/
 cp ~/deployment/spark-1.3.1-bin-hadoop2.6/conf/spark-env.sh ~/ambari-vagrant/centos6.4/
-cp /sparkproject/testMapPartition.txt ~/ambari-vagrant/centos6.4/
+#cp /sparkproject/testMapPartition.txt ~/ambari-vagrant/centos6.4/
 
 # then on vm 
 sudo su -
 export INSTALL_LOCATION=/sparkproject
 cd $INSTALL_LOCATION
 yes | cp /vagrant/musicRecommender-0.0.1-SNAPSHOT-jar-with-dependencies.jar $INSTALL_LOCATION
+
 yes | cp /vagrant/generateDailyEvents.sh $INSTALL_LOCATION
-./generateDailyEvents.sh
+
+./generateDailyEvents.sh daily
+./generateDailyEvents.sh acc
 mkdir config
-yes | cp /vagrant/recommenderConfig.json config
+yes | cp /vagrant/recommenderConfig.json $INSTALL_LOCATION/config
+
 yes | cp /vagrant/spark-defaults.conf $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+
 yes | cp /vagrant/spark-env.sh $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+
 yes | cp /vagrant/log4j.properties $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
+
 yes | cp /vagrant/slaves $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/conf
-yes | cp /vagrant/testMapPartition.txt $INSTALL_LOCATION
+
+#yes | cp /vagrant/testMapPartition.txt $INSTALL_LOCATION
+
 #cp /vagrant/acc* .
 #cp /vagrant/daily* .
 mkdir $INSTALL_LOCATION/sparkeventlogs
@@ -189,6 +214,7 @@ sbin/stop-all.sh
 
 # vm make space
 rm -rf $INSTALL_LOCATION/spark-1.5.1-bin-hadoop2.6/work/*
+rm -rf /tmp/spark*
 
 #clean up input files
 rm -f accumulatedRatings-new*

@@ -1,10 +1,13 @@
 {
 	"daily_rating_file_path" : "/sparkproject/daily_user_track_event_*.txt",
 	"daily_rating_file_path_toConstruct" : "/sparkproject/daily_user_track_event_00",
-	"accumulated_rating_file_path" : "/sparkproject/accumulatedRatings-001*.txt",
+	"accumulated_rating_file_path" : "/sparkproject/accumulatedRatings-00*.txt",
 	"updated_accumulated_rating_file_path_toConstruct" : "/sparkproject/accumulatedRatings-new-001-00",
 	"daily_rating_kafka_topic" : "test",
 	"streaming_validation_file_path_toConstruct" : "/sparkproject/streamingResult",
 	"validation_result":"/sparkproject/batchrec/result",
-	"num_of_top_rec_to_keep":1
+	"num_of_top_rec_to_keep":1,
+	"als_num_of_blocks":5000,
+	"als_num_of_iteration":15,
+	"als_rank":40
 }
