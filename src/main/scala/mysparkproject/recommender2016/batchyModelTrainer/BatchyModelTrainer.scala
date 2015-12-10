@@ -111,7 +111,7 @@ object batchyModelTrainer {
       * */
       //mocking latency to spill a map to disk here
       //mockLatency(2000000000)
-      
+      /*
       //mock hashing to get corresponding daily rating file, which contains random user id.
       //mocking user id in daily rating file below. in real case, we use hashing instead of range.
       val rangeBase = 60000000 / 10 //60M/10
@@ -147,7 +147,7 @@ object batchyModelTrainer {
         }
       }
       println("rating merging. map udpated: " + accMap.size)
-      
+      */
       //mocking a map spillable to disk, reducing its size but we need to put all input data into ALS
       //so here use it to pass the RDD intact onto next transformation
       val newItr = itr.map(element => {
@@ -172,12 +172,11 @@ object batchyModelTrainer {
     }
     
     //write back to acc rating files. for fault tolerant purpose, we write to temp files and then rename
-    //neglecting for now as it exceeds max size Spark can cache
-    //in real case, we should incorporate Spark's ticket to allow bigger sizes
-    //val activeRatingsWritten = activeRatings.persist(StorageLevel.MEMORY_AND_DISK_2)
-    
-    /* studying ALS. reduce wait time for now
-    val justToRunAJob = activeRatings.mapPartitionsWithIndex((index, ratingItr) => {
+    //if each acc rating file is more than 1.1G, it would throw exceeds integer max size exception
+    //there is already a Spark's ticket to allow bigger sizes, when it's ready, we should incorporate
+    //val activeRatingsWritten = activeRatings.persist(StorageLevel.DISK_ONLY_2)
+    /*
+    val justToRunAJob = activeRatingsWritten.mapPartitionsWithIndex((index, ratingItr) => {
       //in real world, file name should based on hash value of userid
       val writer = new PrintWriter(new File(accFilesToConstruct + index + ".txt"))
       while(ratingItr.hasNext){

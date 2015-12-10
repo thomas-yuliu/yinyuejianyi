@@ -7,7 +7,7 @@
 	"streaming_validation_file_path_toConstruct" : "/sparkproject/streamingResult",
 	"validation_result":"/sparkproject/batchrec/result",
 	"num_of_top_rec_to_keep":1,
-	"als_num_of_blocks":5000,
+	"als_num_of_blocks":2000,
 	"als_num_of_iteration":15,
 	"als_rank":40
 }

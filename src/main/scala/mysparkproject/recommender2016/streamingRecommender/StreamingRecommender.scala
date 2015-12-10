@@ -35,17 +35,26 @@ object StreamingRecommender {
     val topicName = ConfigLoader.query("daily_rating_kafka_topic")
     val topicMap = collection.immutable.HashMap(topicName -> 1)
 
-    val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap, StorageLevel.MEMORY_AND_DISK_SER).map(_._2)
+    //val msgs = KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap, StorageLevel.MEMORY_AND_DISK_SER).map(_._2)
     //msgs.saveAsTextFiles("/Users/yliu/deployment/recommendationProject/streamingResult/sresult", "txt")
 
+    val streams = (1 to 100) //should read from config file. this is kafka partition
+    .map { _ =>
+    KafkaUtils.createStream(ssc, zkQuorum, consumerGroup, topicMap, StorageLevel.MEMORY_AND_DISK_SER).map(_._2)
+  }
+    val unifiedStream = ssc.union(streams)
+    
     //parse daily events into tuple
-    val eventPairs = msgs.map(line => line.split(",") match {
+    val eventPairs = unifiedStream.map(line => line.split(",") match {
       case Array(userid: String, trackid: String, timestamp: String, msPlayed: String, reasonStart: String, reasonEnd: String) =>
         trackid -> (userid, trackid, timestamp, msPlayed, reasonStart, reasonEnd)
     })
     
+    val numOfProcessingPartitions = 100//to read from config file
+    //you can use groupbykey. no time to change
     val groupByTrack = eventPairs.map(event => event._1 -> List(event._2)) //convert to list to make reduce function easier
-      .reduceByKey((event1, event2) => event1 ++ event2)//could be a long list for hot songs
+      .reduceByKey((event1 : List[(String, String, String, String, String, String)], event2 : List[(String, String, String, String, String, String)]) => event1 ++ event2,
+          numOfProcessingPartitions)//could be a long list for hot songs
     //now in the form of trackId -> list(event)
     val computedWeight = groupByTrack.map {
       case (trackId, events) => {
